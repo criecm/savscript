@@ -1,0 +1,15 @@
+# JOYPERS
+fping -q joypers && ( test -f /var/run/rsync_joypers.run && exit 1 || touch /var/run/rsync_joypers.run; \
+        echo -n "rsync joypers: /var"; \
+        $RSYNC $RSYNC_OPTS root@joypers:/var/ /sav/joypers/var/; \
+        echo -n ". /usr"; \
+        $RSYNC $RSYNC_OPTS --exclude obj --exclude src --exclude ports --delete-excluded root@joypers:/usr/ /sav/joypers/usr/; \
+        echo -n ". /home"; \
+        $RSYNC $RSYNC_OPTS root@joypers:/home/ /sav/joypers/home/; \
+        echo -n ". /"; \
+        $RSYNC $RSYNC_OPTS --exclude /home --exclude /var --exclude /usr --exclude /users root@joypers:/ /sav/joypers/; \
+        touch /sav/joypers; \
+        rm -f /var/run/rsync_joypers.run; \
+        echo ". done."; \
+) || echo "joypers down ???" >&2
+

@@ -1,0 +1,17 @@
+# ent2
+fping -q ent2 && ( test -f /var/run/rsync_ent2.run && exit 1 || touch /var/run/rsync_ent2.run; \
+        test -d /sav/ent2 || mkdir -p /sav/ent2; \
+	echo -n "ent2: "; \
+        echo -n "/home"; \
+        $RSYNC $RSYNC_OPTS root@ent2:/home/ /sav/ent2/home/; \
+        echo -n ". /usr"; \
+        $RSYNC $RSYNC_OPTS root@ent2:/usr/ /sav/ent2/usr/; \
+        echo -n ". /var"; \
+        $RSYNC $RSYNC_OPTS root@ent2:/var/ /sav/ent2/var/; \
+        echo -n ". /"; \
+        $RSYNC $RSYNC_OPTS --exclude /home/ --exclude /data/ --exclude /usr/ --exclude /var/ root@ent2:/ /sav/ent2/; \
+        touch /sav/ent2; \
+        rm -f /var/run/rsync_ent2.run; \
+        echo ". done."; \
+) || echo "ent2 down ???" >&2
+

@@ -1,0 +1,16 @@
+# CHUBB
+fping -q chubb && ( test -f /var/run/rsync_chubb.run && exit 1 || touch /var/run/rsync_chubb.run; \
+        test -d /sav/chubb || mkdir -p /sav/chubb; \
+        echo -n "rsync chubb: /var"; \
+        $RSYNC $RSYNC_OPTS chubb:/var/ /sav/chubb/var/; \
+        echo -n ". /usr"; \
+        $RSYNC $RSYNC_OPTS chubb:/usr/ /sav/chubb/usr/; \
+        echo -n ". /home"; \
+        $RSYNC $RSYNC_OPTS chubb:/home/ /sav/chubb/home/; \
+        echo -n ". /"; \
+        $RSYNC $RSYNC_OPTS --exclude /var --exclude /usr --exclude /home chubb:/ /sav/chubb/; \
+        touch /sav/chubb; \
+        rm -f /var/run/rsync_chubb.run; \
+        echo ". done."; \
+) || echo "chubb down ???" >&2
+

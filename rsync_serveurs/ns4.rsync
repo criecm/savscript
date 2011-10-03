@@ -1,0 +1,17 @@
+# NS4
+fping -q ns4 && ( test -f /var/run/rsync_ns4.run && exit 1 || touch /var/run/rsync_ns4.run; \
+        test -d /sav/ns4 || mkdir -p /sav/ns4; \
+        echo -n "rsync ns4: /var"; \
+        $RSYNC $RSYNC_OPTS ns4:/var/ /sav/ns4/var/; \
+        echo -n ". /usr"; \
+        $RSYNC $RSYNC_OPTS --exclude ports/ --exclude obj/ --exclude src/ --exclude /rel/ --exclude /xobj/ --exclude /xenocara/ ns4:/usr/ /sav/ns4/usr/; \
+	echo -n ". /usr/ports/packages"; \
+	test -d /sav/ns4/usr/ports/packages || mkdir -p /sav/ns4/usr/ports/packages; \
+        $RSYNC $RSYNC_OPTS ns4:/usr/ports/packages/ /sav/ns4/usr/ports/packages/; \
+        echo -n ". /"; \
+        $RSYNC $RSYNC_OPTS --exclude /var --exclude /usr ns4:/ /sav/ns4/; \
+        touch /sav/ns4; \
+        rm -f /var/run/rsync_ns4.run; \
+        echo ". done."; \
+) || echo "ns4 down ???" >&2
+

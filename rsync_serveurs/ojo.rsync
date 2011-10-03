@@ -1,0 +1,18 @@
+# ojo
+fping -q ojo && ( test -f /var/run/rsync_ojo.run && exit 1 || touch /var/run/rsync_ojo.run; \
+        test -d /sav/ojo || mkdir -p /sav/ojo; \
+        echo -n "rsync ojo: /data"; \
+        $RSYNC $RSYNC_OPTS root@ojo:/data/ /sav/ojo/data/; \
+        echo -n "rsync ojo: /home"; \
+        $RSYNC $RSYNC_OPTS root@ojo:/home/ /sav/ojo/home/; \
+        echo -n ". /usr"; \
+        $RSYNC $RSYNC_OPTS root@ojo:/usr/ /sav/ojo/usr/; \
+        echo -n ". /var"; \
+        $RSYNC $RSYNC_OPTS root@ojo:/var/ /sav/ojo/var/; \
+        echo -n ". /"; \
+        $RSYNC $RSYNC_OPTS --exclude /home/ --exclude /data/ --exclude /usr/ --exclude /var/ root@ojo:/ /sav/ojo/; \
+        touch /sav/ojo; \
+        rm -f /var/run/rsync_ojo.run; \
+        echo ". done."; \
+) || echo "ojo down ???" >&2
+

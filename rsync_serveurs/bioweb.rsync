@@ -1,0 +1,14 @@
+# BIOWEB
+fping -q bioweb.biomeca.org && ( test -f /var/run/rsync_bioweb.run && exit 1 || touch /var/run/rsync_bioweb.run; \
+        test -d /sav/bioweb || mkdir -p /sav/bioweb; \
+        echo -n "rsync bioweb: /var"; \
+        $RSYNC $RSYNC_OPTS bioweb.biomeca.org:/var/ /sav/bioweb/var/; \
+        echo -n ". /usr"; \
+        $RSYNC $RSYNC_OPTS bioweb.biomeca.org:/usr/ /sav/bioweb/usr/; \
+        echo -n ". /"; \
+        $RSYNC $RSYNC_OPTS --exclude /var --exclude /usr bioweb.biomeca.org:/ /sav/bioweb/; \
+        touch /sav/bioweb; \
+        rm -f /var/run/rsync_bioweb.run; \
+        echo ". done."; \
+) || echo "bioweb down ???" >&2
+

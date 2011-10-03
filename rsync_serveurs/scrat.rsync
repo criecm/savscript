@@ -1,0 +1,15 @@
+# SCRAT
+fping -q scrat && ( test -f /var/run/rsync_scrat.run && exit 1 || touch /var/run/rsync_scrat.run; \
+        test -d /sav/scrat || mkdir -p /sav/scrat; \
+        echo -n "rsync scrat: /var"; \
+        $RSYNC $RSYNC_OPTS root@scrat:/var/ /sav/scrat/var/; \
+        echo -n ". /usr"; \
+        $RSYNC $RSYNC_OPTS --exclude obj --exclude src --exclude ports --delete-excluded root@scrat:/usr/ /sav/scrat/usr/; \
+	$RSYNC $RSYNC_OPTS root@scrat:/data/ /sav/scrat/data/; \
+        echo -n ". /"; \
+        $RSYNC $RSYNC_OPTS --exclude /var/ --exclude /usr/ --exclude /data/ root@scrat:/ /sav/scrat/; \
+        touch /sav/scrat; \
+        rm -f /var/run/rsync_scrat.run; \
+        echo ". done."; \
+) || echo "scrat down ???" >&2
+

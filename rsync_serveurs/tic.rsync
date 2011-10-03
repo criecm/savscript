@@ -1,0 +1,16 @@
+# TIC
+fping -q tic && ( test -f /var/run/rsync_tic.run && exit 1 || touch /var/run/rsync_tic.run; \
+        test -d /sav/tic || mkdir -p /sav/tic; \
+        echo -n "rsync tic: /var"; \
+        $RSYNC $RSYNC_OPTS tic:/var/ /sav/tic/var/; \
+        echo -n ". /home"; \
+        $RSYNC $RSYNC_OPTS tic:/home/ /sav/tic/home/; \
+        echo -n ". /usr"; \
+        $RSYNC $RSYNC_OPTS --exclude obj --exclude src --exclude ports --delete-excluded tic:/usr/ /sav/tic/usr/; \
+        echo -n ". /"; \
+        $RSYNC $RSYNC_OPTS --exclude /var --exclude /usr tic:/ /sav/tic/; \
+        touch /sav/tic; \
+        rm -f /var/run/rsync_tic.run; \
+        echo ". done."; \
+) || echo "tic down ???" >&2
+

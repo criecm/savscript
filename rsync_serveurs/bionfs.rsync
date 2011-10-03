@@ -1,0 +1,19 @@
+# BIONFS
+
+fping -q bionfs.biomeca.org && ( test -f /var/run/rsync_bionfs.run && exit 1 || touch /var/run/rsync_bionfs.run; \
+        test -d /sav/bionfs || mkdir -p /sav/bionfs; \
+        echo -n "rsync bionfs: /var"; \
+        $RSYNC $RSYNC_OPTS bionfs.biomeca.org:/var/ /sav/bionfs/var/; \
+        echo -n ". /usr"; \
+        $RSYNC $RSYNC_OPTS --exclude obj --exclude src --exclude ports --delete-excluded bionfs.biomeca.org:/usr/ /sav/bionfs/usr/; \
+        echo -n ". /"; \
+        $RSYNC $RSYNC_OPTS --exclude /u/stud/ --exclude /u/perm/ --exclude /u/piv/ --exclude /var/ --exclude /usr/ bionfs.biomeca.org:/ /sav/bionfs/; \
+#	echo -n ". /u/perm"; \
+#	$RSYNC $RSYNC_OPTS bionfs.biomeca.org:/u/perm/ /sav/bionfs/u/perm/; \
+#	echo -n ". /u/stud"; \
+#	$RSYNC $RSYNC_OPTS bionfs.biomeca.org:/u/stud/ /sav/bionfs/u/stud/; \
+        touch /sav/bionfs; \
+        rm -f /var/run/rsync_bionfs.run; \
+        echo ". done."; \
+) || echo "bionfs down ???" >&2
+

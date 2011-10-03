@@ -1,0 +1,15 @@
+# JOYSTUD
+fping -q joystud && ( test -f /var/run/rsync_joystud.run && exit 1 || touch /var/run/rsync_joystud.run; \
+        echo -n "rsync joystud: /var"; \
+        $RSYNC $RSYNC_OPTS root@joystud:/var/ /sav/joystud/var/; \
+        echo -n ". /usr"; \
+        $RSYNC $RSYNC_OPTS --exclude obj --exclude src --exclude ports --delete-excluded root@joystud:/usr/ /sav/joystud/usr/; \
+        echo -n ". /home"; \
+        $RSYNC $RSYNC_OPTS root@joystud:/home/ /sav/joystud/home/; \
+        echo -n ". /"; \
+        $RSYNC $RSYNC_OPTS --exclude /home --exclude /var --exclude /usr --exclude /users root@joystud:/ /sav/joystud/; \
+        touch /sav/joystud; \
+        rm -f /var/run/rsync_joystud.run; \
+        echo ". done."
+) || echo "joystud down ???" >&2
+

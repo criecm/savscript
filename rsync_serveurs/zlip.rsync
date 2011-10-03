@@ -1,0 +1,14 @@
+# ZLIP
+fping -q zlip && ( test -f /var/run/rsync_zlip.run && exit 1 || touch /var/run/rsync_zlip.run; \
+        test -d /sav/zlip || mkdir -p /sav/zlip; \
+        echo -n "rsync zlip: /var"; \
+        $RSYNC $RSYNC_OPTS /var/ /sav/zlip/var/; \
+        echo -n ". /usr"; \
+        $RSYNC $RSYNC_OPTS --exclude obj --exclude src --exclude ports --delete-excluded /usr/ /sav/zlip/usr/; \
+        echo -n ". /"; \
+        $RSYNC $RSYNC_OPTS --exclude /var --exclude /usr / /sav/zlip/; \
+        touch /sav/zlip; \
+        rm -f /var/run/rsync_zlip.run; \
+        echo ". done."; \
+) || echo "zlip down ??? (mais c'est moi ca !)" >&2
+
