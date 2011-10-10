@@ -1,0 +1,16 @@
+# BATAVIA
+fping -q batavia2 && ( test -f /var/run/rsync_batavia2.run && exit 1 || touch /var/run/rsync_batavia2.run; \
+        test -d /sav/batavia2 || mkdir -p /sav/batavia2; \
+        echo -n "rsync batavia2: /var"; \
+        $RSYNC $RSYNC_OPTS root@batavia2:/var/ /sav/batavia2/var/; \
+        echo -n ". /usr"; \
+        $RSYNC $RSYNC_OPTS --exclude obj --exclude src --exclude ports --delete-excluded root@batavia2:/usr/ /sav/batavia2/usr/; \
+        echo -n "rsync batavia2: /home"; \
+        $RSYNC $RSYNC_OPTS root@batavia2:/home/ /sav/batavia2/home/; \
+        echo -n ". /"; \
+        $RSYNC $RSYNC_OPTS --exclude /var --exclude /usr root@batavia2:/ /sav/batavia2/; \
+        touch /sav/batavia2; \
+        rm -f /var/run/rsync_batavia2.run; \
+        echo ". done."; \
+) || echo "batavia2 down ???" >&2
+
