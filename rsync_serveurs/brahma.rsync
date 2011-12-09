@@ -1,0 +1,19 @@
+# CHUBB
+fping -q brahma && ( \
+        test -d /sav/brahma || mkdir -p /sav/brahma; \
+        echo -n "rsync brahma: /boot"; \
+        $RSYNC $RSYNC_OPTS brahma:/boot/ /sav/brahma/boot/; \
+        echo -n "rsync brahma: /var"; \
+        $RSYNC $RSYNC_OPTS brahma:/var/ /sav/brahma/var/; \
+        echo -n ". /usr"; \
+        $RSYNC $RSYNC_OPTS brahma:/usr/ /sav/brahma/usr/; \
+        echo -n ". /home"; \
+        $RSYNC $RSYNC_OPTS brahma:/home/ /sav/brahma/home/; \
+        echo -n ". /usr/local"; \
+        $RSYNC $RSYNC_OPTS brahma:/usr/local/ /sav/brahma/usr/local/; \
+        echo -n ". /"; \
+        $RSYNC $RSYNC_OPTS --exclude /tmp/ brahma:/ /sav/brahma/; \
+        touch /sav/brahma; \
+        echo ". done."; \
+) || echo "brahma down ???" >&2
+
