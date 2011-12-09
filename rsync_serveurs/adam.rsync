@@ -1,5 +1,5 @@
 # adam
-fping -q adam && ( test -f /var/run/rsync_adam.run && exit 1 || touch /var/run/rsync_adam.run; \
+fping -q adam && ( \
         test -d /sav/adam || mkdir -p /sav/adam; \
         echo -n "rsync adam: /boot"; \
         $RSYNC $RSYNC_OPTS root@adam:/boot/ /sav/adam/boot/; \
@@ -12,7 +12,6 @@ fping -q adam && ( test -f /var/run/rsync_adam.run && exit 1 || touch /var/run/r
         echo -n ". /"; \
         $RSYNC $RSYNC_OPTS --exclude /home/ --exclude /boot/ --exclude /usr/ --exclude /var/ root@adam:/ /sav/adam/; \
         touch /sav/adam; \
-        rm -f /var/run/rsync_adam.run; \
         echo ". done."; \
 ) || echo "adam down ???" >&2
 

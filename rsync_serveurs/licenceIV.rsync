@@ -1,5 +1,5 @@
 # licenceIV
-fping -q licenceIV && ( test -f /var/run/rsync_licenceIV.run && exit 1 || touch /var/run/rsync_licenceIV.run; \
+fping -q licenceIV && ( \
         test -d /sav/licenceIV || mkdir -p /sav/licenceIV; \
         echo -n "rsync licenceIV: /home"; \
         $RSYNC $RSYNC_OPTS root@licenceIV:/home/ /sav/licenceIV/home/; \
@@ -9,7 +9,6 @@ fping -q licenceIV && ( test -f /var/run/rsync_licenceIV.run && exit 1 || touch 
         echo -n ". /"; \
         $RSYNC $RSYNC_OPTS --exclude /home --exclude /usr/local root@licenceIV:/ /sav/licenceIV/; \
         touch /sav/licenceIV; \
-        rm -f /var/run/rsync_licenceIV.run; \
         echo ". done."; \
 ) || echo "licenceIV down ???" >&2
 

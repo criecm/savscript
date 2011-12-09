@@ -1,5 +1,5 @@
 # NS3
-fping -q ns3 && ( test -f /var/run/rsync_ns3.run && exit 1 || touch /var/run/rsync_ns3.run; \
+fping -q ns3 && ( \
         test -d /sav/ns3 || mkdir -p /sav/ns3; \
         echo -n "rsync ns3: /var"; \
         $RSYNC $RSYNC_OPTS ns3:/var/ /sav/ns3/var/; \
@@ -11,7 +11,6 @@ fping -q ns3 && ( test -f /var/run/rsync_ns3.run && exit 1 || touch /var/run/rsy
         echo -n ". /"; \
         $RSYNC $RSYNC_OPTS --exclude /var --exclude /usr ns3:/ /sav/ns3/; \
         touch /sav/ns3; \
-        rm -f /var/run/rsync_ns3.run; \
         echo ". done."; \
 ) || echo "ns3 down ???" >&2
 

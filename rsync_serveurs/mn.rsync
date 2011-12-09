@@ -1,5 +1,5 @@
 # MN
-fping -q mn.mn.ec-m.fr && ( test -f /var/run/rsync_mn.run && exit 1 || touch /var/run/rsync_mn.run; \
+fping -q mn.mn.ec-m.fr && ( \
         test -d /sav/mn || mkdir -p /sav/mn; \
         echo -n "rsync mn: /var"; \
         $RSYNC $RSYNC_OPTS mn.mn.ec-m.fr:/var/ /sav/mn/var/; \
@@ -10,7 +10,6 @@ fping -q mn.mn.ec-m.fr && ( test -f /var/run/rsync_mn.run && exit 1 || touch /va
         echo -n ". /"; \
         $RSYNC $RSYNC_OPTS --exclude /var/ --exclude /usr/ --exclude /mn/ --exclude /home/ mn.mn.ec-m.fr:/ /sav/mn/; \
         touch /sav/mn; \
-        rm -f /var/run/rsync_mn.run; \
         echo ". done."; \
 ) || echo "mn down ???" >&2
 

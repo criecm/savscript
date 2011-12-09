@@ -1,5 +1,5 @@
 # gutenberg
-fping -q gutenberg && ( test -f /var/run/rsync_gutenberg.run && exit 1 || touch /var/run/rsync_gutenberg.run; \
+fping -q gutenberg && ( \
         test -d /sav/gutenberg || mkdir -p /sav/gutenberg; \
         echo -n "rsync gutenberg: /usr"; \
         $RSYNC $RSYNC_OPTS root@gutenberg:/usr/ /sav/gutenberg/usr/; \
@@ -10,7 +10,6 @@ fping -q gutenberg && ( test -f /var/run/rsync_gutenberg.run && exit 1 || touch 
         echo -n ". /"; \
         $RSYNC $RSYNC_OPTS --exclude /usr/ --exclude /var/ --exclude /home/ root@gutenberg:/ /sav/gutenberg/; \
         touch /sav/gutenberg; \
-        rm -f /var/run/rsync_gutenberg.run; \
         echo ". done."; \
 ) || echo "gutenberg down ???" >&2
 

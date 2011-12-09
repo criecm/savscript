@@ -1,5 +1,5 @@
 # SHAUN
-fping -q shaun && ( test -f /var/run/rsync_shaun.run && exit 1 || touch /var/run/rsync_shaun.run; \
+fping -q shaun && ( \
         test -d /sav/shaun || mkdir -p /sav/shaun; \
         echo -n "rsync shaun: /var"; \
         $RSYNC $RSYNC_OPTS /var/ /sav/shaun/var/; \
@@ -8,7 +8,6 @@ fping -q shaun && ( test -f /var/run/rsync_shaun.run && exit 1 || touch /var/run
         echo -n ". /"; \
         $RSYNC $RSYNC_OPTS --exclude /var --exclude /usr / /sav/shaun/; \
         touch /sav/shaun; \
-        rm -f /var/run/rsync_shaun.run; \
         echo ". done."; \
 ) || echo "shaun down ??? (mais c'est moi ca !)" >&2
 

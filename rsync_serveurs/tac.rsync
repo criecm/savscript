@@ -1,5 +1,5 @@
 # TAC
-fping -q tac && ( test -f /var/run/rsync_tac.run && exit 1 || touch /var/run/rsync_tac.run; \
+fping -q tac && ( \
         test -d /sav/tac || mkdir -p /sav/tac; \
         echo -n "rsync tac: /var"; \
         $RSYNC $RSYNC_OPTS tac:/var/ /sav/tac/var/; \
@@ -10,7 +10,6 @@ fping -q tac && ( test -f /var/run/rsync_tac.run && exit 1 || touch /var/run/rsy
         echo -n ". /"; \
         $RSYNC $RSYNC_OPTS --exclude /var --exclude /usr tac:/ /sav/tac/; \
         touch /sav/tac; \
-        rm -f /var/run/rsync_tac.run; \
         echo ". done."; \
 ) || echo "tac down ???" >&2
 

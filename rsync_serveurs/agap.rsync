@@ -1,6 +1,8 @@
 # AGAP
-fping -q agap && ( test -f /var/run/rsync_agap.run && exit 1 || touch /var/run/rsync_agap.run; \
+fping -q agap && ( \
         test -d /sav/agap || mkdir -p /sav/agap; \
+        echo -n "rsync agap: /home"; \
+        $RSYNC $RSYNC_OPTS root@agap:/home/ /sav/agap/home/; \
         echo -n "rsync agap: /var"; \
         $RSYNC $RSYNC_OPTS root@agap:/var/ /sav/agap/var/; \
         echo -n ". /usr"; \
@@ -8,7 +10,6 @@ fping -q agap && ( test -f /var/run/rsync_agap.run && exit 1 || touch /var/run/r
         echo -n ". /"; \
         $RSYNC $RSYNC_OPTS --exclude /var --exclude /usr root@agap:/ /sav/agap/; \
         touch /sav/agap; \
-        rm -f /var/run/rsync_agap.run; \
         echo ". done."; \
 ) || echo "agap down ???" >&2
 

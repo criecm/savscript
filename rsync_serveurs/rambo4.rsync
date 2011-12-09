@@ -1,5 +1,5 @@
 # rambo4
-fping -q rambo4 && ( test -f /var/run/rsync_rambo4.run && exit 1 || touch /var/run/rsync_rambo4.run; \
+fping -q rambo4 && ( \
         echo -n "rsync rambo4: /usr"; \
         $RSYNC $RSYNC_OPTS --exclude obj --exclude src --exclude ports --delete-excluded root@rambo4:/usr/ /sav/rambo4/usr/; \
         echo -n ". /var"; \
@@ -9,7 +9,6 @@ fping -q rambo4 && ( test -f /var/run/rsync_rambo4.run && exit 1 || touch /var/r
         echo -n ". /"; \
         $RSYNC $RSYNC_OPTS --exclude /usr --exclude /var --exclude /rembo root@rambo4:/ /sav/rambo4/; \
         touch /sav/rambo4; \
-        rm -f /var/run/rsync_rambo4.run; \
         echo ". done."; \
 ) || echo "rambo4 down ???" >&2
 

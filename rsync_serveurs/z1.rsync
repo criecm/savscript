@@ -1,5 +1,5 @@
 # z1
-fping -q z1 && ( test -f /var/run/rsync_z1.run && exit 1 || touch /var/run/rsync_z1.run; \
+fping -q z1 && ( \
         test -d /sav/z1 || mkdir -p /sav/z1; \
         echo -n "rsync z1: /opt"; \
         $RSYNC $RSYNC_OPTS root@z1:/opt/ /sav/z1/opt/; \
@@ -8,7 +8,6 @@ fping -q z1 && ( test -f /var/run/rsync_z1.run && exit 1 || touch /var/run/rsync
         echo -n ". /"; \
         $RSYNC $RSYNC_OPTS --exclude /opt/ --exclude /var/ root@z1:/ /sav/z1/; \
         touch /sav/z1; \
-        rm -f /var/run/rsync_z1.run; \
         echo ". done."; \
 ) || echo "z1 down ???" >&2
 

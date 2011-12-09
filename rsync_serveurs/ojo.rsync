@@ -1,5 +1,5 @@
 # ojo
-fping -q ojo && ( test -f /var/run/rsync_ojo.run && exit 1 || touch /var/run/rsync_ojo.run; \
+fping -q ojo && ( \
         test -d /sav/ojo || mkdir -p /sav/ojo; \
         echo -n "rsync ojo: /data"; \
         $RSYNC $RSYNC_OPTS root@ojo:/data/ /sav/ojo/data/; \
@@ -12,7 +12,6 @@ fping -q ojo && ( test -f /var/run/rsync_ojo.run && exit 1 || touch /var/run/rsy
         echo -n ". /"; \
         $RSYNC $RSYNC_OPTS --exclude /home/ --exclude /data/ --exclude /usr/ --exclude /var/ root@ojo:/ /sav/ojo/; \
         touch /sav/ojo; \
-        rm -f /var/run/rsync_ojo.run; \
         echo ". done."; \
 ) || echo "ojo down ???" >&2
 

@@ -1,5 +1,5 @@
 # eve
-fping -q eve && ( test -f /var/run/rsync_eve.run && exit 1 || touch /var/run/rsync_eve.run; \
+fping -q eve && ( \
         test -d /sav/eve || mkdir -p /sav/eve; \
         echo -n "rsync eve: /boot"; \
         $RSYNC $RSYNC_OPTS root@eve:/boot/ /sav/eve/boot/; \
@@ -12,7 +12,6 @@ fping -q eve && ( test -f /var/run/rsync_eve.run && exit 1 || touch /var/run/rsy
         echo -n ". /"; \
         $RSYNC $RSYNC_OPTS --exclude /home/ --exclude /boot/ --exclude /usr/ --exclude /var/ root@eve:/ /sav/eve/; \
         touch /sav/eve; \
-        rm -f /var/run/rsync_eve.run; \
         echo ". done."; \
 ) || echo "eve down ???" >&2
 

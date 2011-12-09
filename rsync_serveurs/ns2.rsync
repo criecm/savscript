@@ -1,5 +1,5 @@
 # NS2
-fping -q ns2 && ( test -f /var/run/rsync_ns2.run && exit 1 || touch /var/run/rsync_ns2.run; \
+fping -q ns2 && ( \
         test -d /sav/ns2 || mkdir -p /sav/ns2; \
         echo -n "rsync ns2: /var"; \
         $RSYNC $RSYNC_OPTS ns2:/var/ /sav/ns2/var/; \
@@ -11,7 +11,6 @@ fping -q ns2 && ( test -f /var/run/rsync_ns2.run && exit 1 || touch /var/run/rsy
         echo -n ". /"; \
         $RSYNC $RSYNC_OPTS --exclude /var --exclude /usr ns2:/ /sav/ns2/; \
         touch /sav/ns2; \
-        rm -f /var/run/rsync_ns2.run; \
         echo ". done."; \
 ) || echo "ns2 down ???" >&2
 

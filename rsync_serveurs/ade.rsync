@@ -1,10 +1,9 @@
 # ade
-fping -q ade && ( test -f /var/run/rsync_ade.run && exit 1 || touch /var/run/rsync_ade.run; \
+fping -q ade && ( \
         test -d /sav/ade || mkdir -p /sav/ade; \
         echo -n ". /"; \
         $RSYNC $RSYNC_OPTS root@ade:/ /sav/ade/; \
         touch /sav/ade; \
-        rm -f /var/run/rsync_ade.run; \
         echo ". done."; \
 ) || echo "ade down ???" >&2
 

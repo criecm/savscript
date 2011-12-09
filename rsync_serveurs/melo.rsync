@@ -1,5 +1,5 @@
 # MELO
-fping -q melo && ( test -f /var/run/rsync_melo.run && exit 1 || touch /var/run/rsync_melo.run; \
+fping -q melo && ( \
         test -d /sav/melo || mkdir -p /sav/melo; \
         echo -n "rsync melo: /var"; \
         $RSYNC $RSYNC_OPTS melo:/var/ /sav/melo/var/; \
@@ -10,7 +10,6 @@ fping -q melo && ( test -f /var/run/rsync_melo.run && exit 1 || touch /var/run/r
         echo -n ". /"; \
         $RSYNC $RSYNC_OPTS --exclude /var --exclude /usr --exclude /home melo:/ /sav/melo/; \
         touch /sav/melo; \
-        rm -f /var/run/rsync_melo.run; \
         echo ". done."; \
 ) || echo "melo down ???" >&2
 
