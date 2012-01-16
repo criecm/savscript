@@ -2,11 +2,11 @@
 fping -q shaun && ( \
         test -d /sav/shaun || mkdir -p /sav/shaun; \
         echo -n "rsync shaun: /var"; \
-        $RSYNC $RSYNC_OPTS /var/ /sav/shaun/var/; \
+        /usr/local/bin/rsync $RSYNC_OPTS /var/ /sav/shaun/var/; \
         echo -n ". /usr"; \
-        $RSYNC $RSYNC_OPTS --exclude obj --exclude src --exclude ports --delete-excluded /usr/ /sav/shaun/usr/; \
+        /usr/local/bin/rsync $RSYNC_OPTS --exclude obj --exclude src --exclude ports --delete-excluded /usr/ /sav/shaun/usr/; \
         echo -n ". /"; \
-        $RSYNC $RSYNC_OPTS --exclude /var --exclude /usr / /sav/shaun/; \
+        /usr/local/bin/rsync $RSYNC_OPTS --exclude /var --exclude /usr / /sav/shaun/; \
         touch /sav/shaun; \
         echo ". done."; \
 ) || echo "shaun down ??? (mais c'est moi ca !)" >&2

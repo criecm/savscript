@@ -19,20 +19,21 @@ to_exclude_in() {
   fi
 }
 if fping -q $srv; then
-        test -d /sav/$srv || mkdir -p /sav/$srv;
-	echo -n "rsync $srv:";
+        test -d /sav/$srv || mkdir -p /sav/$srv
+	echo -n "rsync $srv:"
         for dir in $($RSYNC_RSH $srv "mount -t zfs,ufs,ext2,ext3,ext4 | sed 's@^.*on \(/[^ ]*\) .*\$@\1@' | sort"); do
 		if ! is_excluded $dir; then
-			echo -n " $dir";
+			echo -n " $dir"
 			EXCLUDES=""
 			for exc in $(to_exclude_in $dir); do
 				EXCLUDES=$EXCLUDES" --exclude $exc"
 			done
-			$RSYNC $RSYNC_OPTS $EXCLUDES $srv:${dir%/}/ /sav/$srv${dir%/}/;
-			echo -n ".";
+			$RSYNC $RSYNC_OPTS $EXCLUDES $srv:${dir%/}/ /sav/$srv${dir%/}/
+			echo -n "."
 		fi
-	done;
-        echo " done :)";
+	done
+	touch /sav/$srv
+        echo " done :)"
 else
   echo "$srv down ???" >&2
   exit 2
