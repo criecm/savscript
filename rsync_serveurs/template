@@ -5,7 +5,8 @@ excludefrom=${0%.rsync}.excludes
 
 is_excluded() {
   test -f $excludefrom || return 1
-  grep '^'$1'$' $excludefrom > /dev/null && return 0
+  [ "$1" = "/" ] || return 1
+  grep '^'$1 $excludefrom > /dev/null && return 0
   return 1
 }
 to_exclude_in() {
