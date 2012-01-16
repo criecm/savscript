@@ -9,6 +9,10 @@ fping -q batavia2 && ( \
         $RSYNC $RSYNC_OPTS root@batavia2:/home/ /sav/batavia2/home/; \
         echo -n ". /"; \
         $RSYNC $RSYNC_OPTS --exclude /var --exclude /usr root@batavia2:/ /sav/batavia2/; \
+	echo -n ". ZFS/data"; \
+	/usr/local/admin/egim/scripts/maintenance/utils/freebsd/zfs_sync_vol -k /root/.ssh/id_rsa_batavia2 zdisques/metrodata@batavia2 disques/sav/batavia2/data; \
+	echo -n ". ZFS/tftpboot"; \
+	/usr/local/admin/egim/scripts/maintenance/utils/freebsd/zfs_sync_vol -k /root/.ssh/id_rsa_batavia2 zdisques/tftpboot@batavia2 disques/sav/batavia2/tftpboot; \
         touch /sav/batavia2; \
         echo ". done."; \
 ) || echo "batavia2 down ???" >&2

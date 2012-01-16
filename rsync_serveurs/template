@@ -1,0 +1,38 @@
+# GENERIC
+srv=$(/usr/bin/basename $0 .rsync)
+excludes=""
+excludefrom=${0%.rsync}.excludes
+
+is_excluded() {
+  test -f $excludefrom || return 1
+  grep '^'$1'$' $excludefrom > /dev/null && return 0
+  return 1
+}
+to_exclude_in() {
+  test -f $excludefrom || return 1
+  grep -v '^[#/]' $excludefrom
+  if [ "$1" = "/" ]; then
+    grep '^'$1 $excludefrom
+  else
+    grep '^'$1 $excludefrom | sed 's@'$1'@@'
+  fi
+}
+if fping -q $srv; then
+        test -d /sav/$srv || mkdir -p /sav/$srv;
+	echo -n "rsync $srv:";
+        for dir in $($RSYNC_RSH $srv "mount -t zfs,ufs,ext2,ext3,ext4 | sed 's@^.*on \(/[^ ]*\) .*\$@\1@' | sort"); do
+		if ! is_excluded $dir; then
+			echo -n " $dir";
+			EXCLUDES=""
+			for exc in $(to_exclude_in $dir); do
+				EXCLUDES=$EXCLUDES" --exclude $exc"
+			done
+			$RSYNC $RSYNC_OPTS $EXCLUDES $srv:${dir%/}/ /sav/$srv${dir%/}/;
+			echo -n ".";
+		fi
+	done;
+        echo " done :)";
+else
+  echo "$srv down ???" >&2
+  exit 2
+fi

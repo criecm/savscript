@@ -1,9 +1,0 @@
-# ade
-fping -q ade && ( \
-        test -d /sav/ade || mkdir -p /sav/ade; \
-        echo -n ". /"; \
-        $RSYNC $RSYNC_OPTS root@ade:/ /sav/ade/; \
-        touch /sav/ade; \
-        echo ". done."; \
-) || echo "ade down ???" >&2
-
