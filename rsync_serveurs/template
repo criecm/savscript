@@ -5,17 +5,19 @@ excludefrom=${0%.rsync}.excludes
 
 is_excluded() {
   test -f $excludefrom || return 1
-  [ "$1" = "/" ] || return 1
-  grep '^'$1 $excludefrom > /dev/null && return 0
+  [ "$1" = "/" ] && return 1
+  for excluded in $(cat $excludefrom); do
+    echo $1 | grep '^'${excluded%/} >/dev/null && return 0
+  done
   return 1
 }
 to_exclude_in() {
   test -f $excludefrom || return 1
-  grep -v '^[#/]' $excludefrom
+  grep -v '^[#/@]' $excludefrom
   if [ "$1" = "/" ]; then
     grep '^'$1 $excludefrom
   else
-    grep '^'$1 $excludefrom | sed 's@'$1'@@'
+    grep '^@\{0,1\}'$1 $excludefrom | sed 's/^@//; s@^'$1'@@;'
   fi
 }
 if fping -q $srv; then
