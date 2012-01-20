@@ -7,9 +7,9 @@
 # TODO: paralleliser un peu (mais pas trop !)
 #   eg: https://github.com/buganini/brackets
 PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin
-RSYNC="/usr/local/bin/rsync"
+RSYNC=${RSYNC:-"/usr/local/bin/rsync"}
 RSYNC_RSH="ssh -i /root/.ssh/id_rsyncsav"
-RSYNC_OPTS='-H -q -4 -aux --delete --exclude .snap/'
+RSYNC_OPTS='-H -q -4 -aux --delete --exclude .snap/ --exclude .zfs/'
 
 export PATH RSYNC RSYNC_RSH RSYNC_OPTS
 
@@ -24,7 +24,8 @@ fi
 mydir=$(dirname $0)
 
 waitupto() {
-  while [ $(pgrep -f rsync_serveurs.sh | wc -l) -gt $((MAXJOBS + 1)) ]; do
+  MYMAX=${1:-$MAXJOBS}
+  while [ $(pgrep -f '/bin/sh '$mydir'/rsync_serveurs.sh ' | wc -l) -gt $(( MYMAX + 1 )) ]; do
     sleep 3
   echo -n "."
   done
@@ -65,12 +66,14 @@ else
   echo "rsync_serveurs: GO "$(date)
   TBEGINALL=$(date +%s)
   for file in $mydir/rsync_serveurs/*.rsync; do
+    waitupto
     serv=${file##*/}
     serv=${serv%.rsync}
     echo "rsync_serveurs: debut $serv "$(date)
+    date >> /var/log/rsync_serveurs.$serv.log
     $0 $serv >> /var/log/rsync_serveurs.$serv.log 2>&1 &
-    waitupto
   done
+  waitupto 0
   echo "rsync_serveurs: THE END ("$(($(date +%s) - $TBEGINALL))"s)"
 fi
 
