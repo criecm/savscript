@@ -40,10 +40,10 @@ if [ $# -gt 0 ]; then
       time lockf -t 0 $lockfile /bin/sh $mydir/rsync_serveurs/$1.rsync
       case $? in
         73)
-          err="Cannot create ${TMPDIR:-/tmp}/rsync.$1.encours"
+          err="Cannot create lockfile $lockfile"
         ;;
         75)
-          err="$mydir/rsync_serveurs/$1.rsync already running"
+          err="$mydir/rsync_serveurs/$1.rsync already running ($lockfile)"
         ;;
         71)
           err="System error (?)"
