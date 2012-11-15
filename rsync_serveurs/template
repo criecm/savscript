@@ -23,7 +23,7 @@ to_exclude_in() {
 if fping -q $srv; then
         test -d /sav/$srv || zfs create disques/sav/$srv
 	echo -n "rsync $srv:"
-        for dir in $($RSYNC_RSH $srv "mount -t zfs,ufs,ext2,ext3,ext4 | sed 's@^.*on \(/[^ ]*\) .*\$@\1@' | sort"); do
+        for dir in $($RSYNC_RSH $srv "mount -t zfs,ufs,ffs,ext2,ext3,ext4 | sed 's@^.*on \(/[^ ]*\) .*\$@\1@' | sort"); do
 		if ! is_excluded $dir; then
 			echo -n " $dir"
 			EXCLUDES=""

@@ -1,4 +1,3 @@
 .zobi
-/usr/ports
-/usr/src/bin
-/var/db/samba
+zpool/usr/ports
+zpool/usr/src
