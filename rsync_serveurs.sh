@@ -10,18 +10,25 @@ PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin
 RSYNC=${RSYNC:-"/usr/local/bin/rsync"}
 RSYNC_RSH="ssh -i /root/.ssh/id_rsyncsav"
 RSYNC_OPTS='-H -q -4 -aux --delete --exclude .snap/ --exclude .zfs/'
+SAVDESTBASE=/sav
+SAVZFSBASE=disques/sav
 
-export PATH RSYNC RSYNC_RSH RSYNC_OPTS
+export PATH RSYNC RSYNC_RSH RSYNC_OPTS SAVDESTBASE SAVZFSBASE
 
 # max n. of concurrent jobs
 MAXJOBS=${MAXJOBS:-10}
 
-if [`mount | grep '/sav' | wc -l 2> /dev/null` -eq 0 ]; then
+if ! mount | grep -q 'on '$SAVDESTBASE ; then
 /sbin/mount /sav || exit 1;
 #UMOUNT=1
 fi
 
 mydir=$(dirname $0)
+
+# pour debugguer: # env DEBUGADONF=1 ./rsync_serveurs.sh machine
+if [ ! -z "$DEBUGADONF" ]; then
+  MAXJOBS=1
+fi
 
 waitupto() {
   MYMAX=${1:-$MAXJOBS}
@@ -37,7 +44,7 @@ if [ $# -gt 0 ]; then
     if [ -f $mydir/rsync_serveurs/$1.rsync ]; then
       lockfile=${TMPDIR:-/tmp}/rsync.$1.encours
       err=""
-      time lockf -t 0 $lockfile /bin/sh $mydir/rsync_serveurs/$1.rsync
+      time lockf -t 0 $lockfile /bin/sh ${DEBUGADONF:+-x }$mydir/rsync_serveurs/$1.rsync
       case $? in
         73)
           err="Cannot create lockfile $lockfile"
