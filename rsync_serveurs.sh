@@ -4,44 +4,135 @@
 #
 # Principe: un script/serveur dans un repertoire rsync_serveurs/
 #
-# TODO: paralleliser un peu (mais pas trop !)
-#   eg: https://github.com/buganini/brackets
+# TODOS: 
+#  - script ajout machine simple (dialog?)
+#  - MAJ script restauration (ZFS slash/root, verifier autres systemes, pb cle ssh, orig:mountpoint)
+#  - script restauration de jail
+#  - menage snapshots (prevu pour un snapshot recursif -> c'est a lui de l'etre)
+#  - gestion syslog (utiliser un local* ou ?, propager a zfs_sync_vol)
+#  - envoi de problemes a $ADMINMAIL
+#
 PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin
-RSYNC=${RSYNC:-"/usr/local/bin/rsync"}
-RSYNC_RSH="ssh -i /root/.ssh/id_rsyncsav"
-RSYNC_OPTS='-H -q -4 -aux --delete --exclude .snap/ --exclude .zfs/'
-SAVDESTBASE=/sav
-SAVZFSBASE=disques/sav
+mydir=$(dirname $0)
 
-export PATH RSYNC RSYNC_RSH RSYNC_OPTS SAVDESTBASE SAVZFSBASE
+if [ -z "$CONFIG_LOADED" ]; then
+  . $mydir/rsync_serveurs.conf
+  for i in RSYNC_OPTS SSH_KEY SAVDESTBASE ADMINMAIL MACHINESDIR FSTYPES; do
+    if ! eval "test -n \"\$$i\""; then
+      echo "manque $i dans la rsync_serveurs.conf" >&2
+      exit 1
+    fi
+  done
+  if [ ! -d $MACHINESDIR ]; then
+    echo "Repertoire $MACHINESDIR inexistant \!" >&2
+    exit 1
+  fi
+  if [ ! -r $SSH_KEY ]; then
+    echo "cle ssh \"$SSH_KEY\" illisible ou inexistante" >&2
+    exit 1
+  fi
+  export CONFIG_LOADED=YES
+fi
 
+while getopts d:h option
+do
+  case $option in
+    d) DEBUG=$OPTARG ;;
+    h) echo "usage: $0 [-d n] [serveur [serveur serveur ...]]"
+       echo "  -d n: debug. 4=affiche les commande au lieu de les lancer. defaut 0"
+       echo "  serveur: le fichier $MACHINESDIR/$serveur.conf sera utilise"
+       exit 0
+    ;;
+  esac
+done
+shift $(expr $OPTIND - 1)
+
+# binaire rsync
+RSYNC=${RSYNC:-"$(which rsync)"}
+# options par defaut pour rsync
+RSYNC_OPTS=${RSYNC_OPTS:-"-H -q -aux --delete --exclude .snap/ --exclude .zfs/"}
+# commande ssh distante
+REMOTE_COMMAND=${REMOTE_COMMAND:-"ssh -i $SSH_KEY"}
+# volume zfs des sauvegardes
+SAVZFSBASE=${SAVZFSBASE:-$(zfs list -H -o name "$SAVDESTBASE")}
+# mail a prevenir en cas de probleme
+ADMINMAIL=${ADMINMAIL:-"dgeo@ec-m.fr"}
+# repertoire de base pour le stockage temporaire des resultats
+TRACESDIRBASE=${TRACESDIRBASE:-"/tmp/LOG.SAUV_TRACES"}
 # max n. of concurrent jobs
 MAXJOBS=${MAXJOBS:-10}
+# syslog facility
+export SYSLOG_FACILITY=${SYSLOG_FACILITY:-"user"}
+# syslog 'program'
+export SYSLOG_TAG=${SYSLOG_TAG:-"SAUVEGARDE"}
+# debug
+DEBUG=${DEBUG:-0}
 
+if ! zfs list -H -o name "$SAVZFSBASE" > /dev/null; then
+  echo "Impossible de trouver le volume ZFS \"$SAVZFSBASE\"" >&2
+  exit 1
+fi
+
+TRACES=$TRACESDIRBASE.$$
+if [ -e "$TRACES" ]; then
+  rm -rf $TRACES
+fi
+mkdir $TRACES
+
+if [ $DEBUG -gt 1 ]; then
+  DEBUGADONF=1
+  if [ $DEBUG -ge 2 ]; then
+    MAXJOBS=1
+  fi
+fi
+
+export PATH RSYNC RSYNC_OPTS SAVDESTBASE SAVZFSBASE mydir TRACES REMOTE_COMMAND SSH_KEY DEBUG MACHINESDIR FSTYPES
+
+## checks
 if ! mount | grep -q 'on '$SAVDESTBASE ; then
 /sbin/mount /sav || exit 1;
 #UMOUNT=1
 fi
 
-mydir=$(dirname $0)
-
-# pour debugguer: # env DEBUGADONF=1 ./rsync_serveurs.sh machine
-if [ ! -z "$DEBUGADONF" ]; then
-  MAXJOBS=1
-fi
-
+## fonction de parallelisation
 waitupto() {
   MYMAX=${1:-$MAXJOBS}
-  while [ $(pgrep -f '/bin/sh '$mydir'/rsync_serveurs.sh ' | wc -l) -gt $(( MYMAX + 1 )) ]; do
+  while [ $(($(pgrep -f '/bin/sh '$mydir'/rsync_serveurs.sh' | wc -l) + $(pgrep -f '/bin/sh '$mydir'/lib/save_one.sh' | wc -l))) -gt $(( MYMAX )) ]; do
     sleep 3
   echo -n "."
   done
 }
 
+. $mydir/lib/log.inc.sh
+
 # s'il y a des arguments, on execute les fichiers correspondants (rsync_serveurs/$arg.rsync)
 if [ $# -gt 0 ]; then
   while [ $# -gt 0 ]; do
-    if [ -f $mydir/rsync_serveurs/$1.rsync ]; then
+    # NEW
+    if [ -f $MACHINESDIR/$1.conf ]; then
+      lockfile=${TMPDIR:-/tmp}/sauv.$1.encours
+      err=""
+      if [ $DEBUG -gt 0 ]; then syslogue "debug" "time lockf -t 0 $lockfile /bin/sh ${DEBUGADONF:+-x }$mydir/lib/save_one.sh $MACHINESDIR/$1.conf"; fi
+      time lockf -t 0 $lockfile /bin/sh ${DEBUGADONF:+-x }$mydir/lib/save_one.sh $MACHINESDIR/$1.conf
+      case $? in
+        73)
+          err="Cannot create lockfile $lockfile"
+        ;;
+        75)
+          err="$mydir/rsync_serveurs/$1.rsync already running ($lockfile)"
+        ;;
+        71)
+          err="System error (?)"
+        ;;
+        70)
+          err="Problem with $mydir/rsync_serveurs/$1.rsync"
+        ;;
+      esac
+      if [ ! -z "$err" ]; then
+        syslogue "error" "$err"
+      fi
+    # OLD
+    elif [ -f $mydir/rsync_serveurs/$1.rsync ]; then
       lockfile=${TMPDIR:-/tmp}/rsync.$1.encours
       err=""
       time lockf -t 0 $lockfile /bin/sh ${DEBUGADONF:+-x }$mydir/rsync_serveurs/$1.rsync
@@ -60,17 +151,17 @@ if [ $# -gt 0 ]; then
         ;;
       esac
       if [ ! -z "$err" ]; then
-        echo "$err"
-        logger -t ${0##*/} -p user.err "$err"
+        syslogue "error" "$err"
       fi
     else
-      echo "$mydir/rsync_serveurs/$1.rsync n'existe pas."
+      syslogue "error" "ni $MACHINESDIR/$1.conf ni $mydir/rsync_serveurs/$1.rsync n'existent."
     fi
     shift
   done
 else
-  # sinon, executer les fichiers *.rsync dans rsync_serveurs/
-  echo "rsync_serveurs: GO "$(date)
+  # sinon, lister les fichiers *.rsync dans rsync_serveurs/
+  # et se lancer pour chacun
+  syslogue "info" "rsync_serveurs: GO $(date)"
   TBEGINALL=$(date +%s)
   for file in $mydir/rsync_serveurs/*.rsync; do
     waitupto
@@ -81,6 +172,18 @@ else
     $0 $serv >> /var/log/rsync_serveurs.$serv.log 2>&1 &
   done
   waitupto 0
-  echo "rsync_serveurs: THE END ("$(($(date +%s) - $TBEGINALL))"s)"
+  /usr/local/admin/utils/freebsd/zfs_snap_make $SAVZFSBASE
+  TOTALS=$(($(date +%s) - $TBEGINALL))
+  syslogue "info" "rsync_serveurs: THE END ($(($TOTALS / 3600))h$(($TOTALS % 3600 / 60))m$(($TOTALS % 3600 % 60))s)"
+fi
+if [ -s $TRACES/msg ]; then
+  if [ ! -z "$ADMINMAIL" ]; then
+    cat $TRACES/msg | mutt -s "[${SYSLOG_TAG}] Problemes avec" $ADMINMAIL -a $(find $TRACES ! -size 0 -type f)
+  else
+    syslogue "error" "Problemes avec:"
+    cat $TRACES/msg | while read line; do syslogue "error" "  $line" ; done
+  fi
+else
+  if [ $DEBUG -le 1 ]; then rm -rf $TRACES; fi
 fi
 
