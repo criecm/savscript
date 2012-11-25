@@ -10,7 +10,7 @@ excludefrom=$TRACES/$NAME.excludes
 ZFS_SYNC_VOL=$(which zfs_sync_vol)
 ZEXCLUDES="-x $excludefrom.zfs"
 #ZOPTS="-k $SSH_KEY -C -m 'GMT-%Y.%m.%d-%H.%M.%S' -I"
-ZOPTS="-k $SSH_KEY -C -I -u ${SYSLOG_ID:+-l $SYSLOG_ID}"
+ZOPTS="-k $SSH_KEY -C -I -u"
 ZRECURSION="-a"
 
 if [ $DEBUG -ge 4 ]; then
@@ -45,8 +45,8 @@ else
     }
 fi
 
-if [ ! -z "$SYSLOG_ID" ]; then
-    ZOPTS=$ZOPTS" -l $SYSLOG_ID"
+if [ ! -z "$SYSLOG_FACILITY" ]; then
+    ZOPTS=$ZOPTS" -l $SYSLOG_FACILITY"
 fi
 # use: rsync_it srcdir/ dstdir/
 rsync_it() {
@@ -426,15 +426,15 @@ get_ufs() {
         ret=$?
         # menage du snapshot source
         $REMOTE_COMMAND $DEST "umount $UFSMOUNTDIR || ( fuser -k -m $UFSMOUNTDIR ; umount -f $UFSMOUNTDIR ); \
-            mdconfig -l -v | fgrep ${dir%/}/.snap/$UFSSNAPNAME | cut -f1 | xargs -L1 mdconfig -d -u && rm -f ${dir%/}/.snap/$UFSSNAPNAME && rmdir $UFSMOUNTDIR;" || plainte "AIIIE: snapshot impossible a supprimer: ${dir%/}/$UFSSNAPNAME monte sur $UFSMOUNTDIR" >> $L 2>&1
+            mdconfig -l -v | fgrep ${dir%/}/.snap/$UFSSNAPNAME | cut -f1 | xargs -L1 mdconfig -d -u && rm -f ${dir%/}/.snap/$UFSSNAPNAME && rmdir $UFSMOUNTDIR;" || syslogue "error" "AIIIE: snapshot impossible a supprimer: ${dir%/}/$UFSSNAPNAME monte sur $UFSMOUNTDIR" >> $L 2>&1
     else
-        plainte "get_ufs_snap($dir): pas reussi a utiliser un snapshot :-/"
+        syslog "error" "get_ufs_snap($dir): pas reussi a utiliser un snapshot :-/"
         rsync_it ${dir%/}/ $mydestdir/ >> $L 2>&1
         ret=$?
     fi
     shellex $ZFS_SNAP_MAKE -q -s $UFSTS $myzfsdest
     if [ $ret -ne 0 ]; then
-        plainte "Probleme a la sauvegarde de ${DEST}:${dir} (UFS+snapshot)"
+        syslog "error" "Probleme a la sauvegarde de ${DEST}:${dir} (UFS+snapshot)"
         warn_admin $ret "get_ufs($*)" $L "Pb avec $RSYNC_COMMAND$RSYNC_DSTBASE$UFSMOUNTDIR"
     fi
     say_end_with $ret
@@ -458,8 +458,9 @@ get_zfs() {
     shellex $ZFS_SYNC_VOL $ZRECURSION $ZEXCLUDES $ZOPTS ${s}@${DEST} ${d} >> $L 2>&1
     ret=$?
     if [ $ret -ne 0 ]; then
-        if fgrep -q 'estination has snapshots' $L; then
-            shellex $ZFS_SYNC_VOL $ZRECURSION $ZEXCLUDES $ZOPTS -B ${s}@${DEST} ${d} >> $L 2>&1
+        if fgrep -q 'No common snapshot' $L; then
+            syslogue "notice" "Deuxieme tentative avec -j pour get_zfs(${s})"
+            shellex $ZFS_SYNC_VOL $ZRECURSION $ZEXCLUDES $ZOPTS -j ${s}@${DEST} ${d} >> $L 2>&1
             ret=$?
         fi
         warn_admin $ret "get_zfs($*)" $L "Pb a la synchro du volume $1"
@@ -516,7 +517,7 @@ get_jail() {
     now_exclude $jaildir
 
     init_zfs_dest ${jaildir}-config $JAILSDESTDIR/${curjail}-config $JAILSZFSDEST/${curjail}-config
-    confdest=${jdest}-config
+    confdest="${jdest}-config"
     doit $REMOTE_COMMAND $DEST "mkdir -p /tmp/${curjail}-config; \
         ( [ -f /usr/local/etc/ezjail/${curjail} ] && cp /usr/local/etc/ezjail/${curjail} /tmp/${curjail}-config ) || \
             fgrep ^jail_${curjail} /etc/rc.conf > /tmp/${curjail}-config/rc.conf; \

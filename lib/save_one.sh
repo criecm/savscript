@@ -35,13 +35,15 @@ if init_srv $DEST; then
     myret=0
 
     # JAILS
-    if [ ! -z "$JAILS" ]; then
-        for jaildir in $JAILS; do
-            if ! is_excluded $jaildir; then
-                get_jail $jaildir
-                myret=$(( $ret + $? ))
-            fi
-        done
+    if [ ! -z "$SAV_JAILS" ]; then
+        if [ ! -z "$JAILS" ]; then
+            for jaildir in $JAILS; do
+                if ! is_excluded $jaildir; then
+                    get_jail $jaildir
+                    myret=$(( $ret + $? ))
+                fi
+            done
+        fi
     fi
 
     # FULL ZFS SCENARIO
@@ -76,8 +78,8 @@ if init_srv $DEST; then
             syslogue "info" "($NAME) FULLZFS: remontage dans l'ordre (racine en ZFS 'legacy'"
             zfs list -H -o canmount,mountpoint,name,mounted -S name -r $ZFSDEST | awk '($1 ~ /^on$/ && $2 !~ /^legacy$/ && $4 ~ /^yes$/) { print $3 }' | xargs -L1 zfs umount
             mount | grep '^'$ZFSDEST'.* on '$DESTDIR | awk '{print $1}' | sort -r | xargs -L1 umount -f
-            mount -tzfs $ZFSDEST/${ZFSSLASH#*/} $(get_zfsdest_for "/")
-            zfs list -H -o canmount,mountpoint,name -r $ZFSDEST | awk '($1 ~ /^on$/ && $2 !~ /^legacy$/ && $2 ~ /'$(echo $DESTDIR|sed 's@/@\/@g')'/) { print $3 }' | xargs -L1 zfs mount
+            mount -tzfs $ZFSDEST/${ZFSSLASH#*/} $DESTDIR
+            zfs list -H -o canmount,mountpoint,name -r $ZFSDEST | awk '($1 ~ /^on$/ && $2 !~ /^legacy$/ && $2 ~ /'$(echo $DESTDIR|sed 's@/@\\/@g')'/) { print $3 }' | xargs -L1 zfs mount
         fi
 
     # AUTRES/MIXED FS SCENARIO
