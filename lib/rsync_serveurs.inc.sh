@@ -92,7 +92,7 @@ rsync_excludes_for() {
 
 # exclus un chemin de la suite
 now_exclude() {
-    EXCLUDED=$EXCLUDED" "$1
+    EXCLUDES=$EXCLUDES" "$1
 }
 
 # exclus un volume ZFS pour la suite
@@ -344,8 +344,8 @@ init_zfs_dest() {
     # creer le vol zfs dest si besoin et le remplir de ce qu'on avait avant dans le meme repertoire
     if ! zfs list -H -o name $myzfsdest >/dev/null 2>&1; then
         if [ -d $mydestdir ]; then
-            doit mv $mydestdir $mydestdir.tmp
-            warn_admin 0 "init_zfs_dest($*)" "" "Le repertoire $mydestdir existait et n'etait pas un volume ZFS. Il a ete deplace en $mydestdir.tmp"
+            doit mv $mydestdir $mydestdir.rsync
+            warn_admin 0 "init_zfs_dest($*)" "" "Le repertoire $mydestdir existait et n'etait pas un volume ZFS. Il a ete deplace en $mydestdir.rsync"
         fi
 
         # en cas de montage d'un zfs dans une arborescence !zfs
@@ -361,13 +361,13 @@ init_zfs_dest() {
         done
         zfs create -o orig:mountpoint=$mydir $myzfsdest
 
-        if [ -d $mydestdir.tmp ]; then
-            cd $mydestdir.tmp 2>> $L && \
-            doit pax -rw -X -pe . $mydestdir 2>> $L && \
-            cd - >/dev/null 2>> $L&& \
-            doit nohup rm -rf $mydestdir.tmp > $L 2>&1 &
-            warn_admin 0 "init_zfs_dest($*)" "$L" "Le contenu de $mydestdir.tmp a ete deplace dans le volume ZFS $mydestdir :)"
-        fi
+#        if [ -d $mydestdir.tmp ]; then
+#            cd $mydestdir.tmp 2>> $L && \
+#            doit pax -rw -X -pe . $mydestdir 2>> $L && \
+#            cd - >/dev/null 2>> $L&& \
+#            doit nohup rm -rf $mydestdir.tmp > $L 2>&1 &
+#            warn_admin 0 "init_zfs_dest($*)" "$L" "Le contenu de $mydestdir.tmp a ete deplace dans le volume ZFS $mydestdir :)"
+#        fi
     else
         # verifier que la destination est bien montee
         mount | grep -q ^$myzfsdest' ' && doit zfs umount $myzfsdest

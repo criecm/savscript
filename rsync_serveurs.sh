@@ -159,20 +159,19 @@ if [ $# -gt 0 ]; then
     shift
   done
 else
-  # sinon, lister les fichiers *.rsync dans rsync_serveurs/
+  # sinon, lister les fichiers *.conf dans machines.d/
   # et se lancer pour chacun
   syslogue "info" "rsync_serveurs: GO $(date)"
   TBEGINALL=$(date +%s)
-  for file in $mydir/rsync_serveurs/*.rsync; do
+  for file in $mydir/machines.d/*.conf; do
     waitupto
-    serv=${file##*/}
-    serv=${serv%.rsync}
-    echo "rsync_serveurs: debut $serv "$(date)
+    serv=$(grep ^NAME $file|cut -d= -f2)
+    echo "rsync_serveurs: debut ${serv} "$(date)
     date >> /var/log/rsync_serveurs.$serv.log
-    $0 $serv >> /var/log/rsync_serveurs.$serv.log 2>&1 &
+    /bin/sh $mydir/lib/save_one.sh $file >> /var/log/rsync_serveurs.$serv.log 2>&1 &
   done
   waitupto 0
-  /usr/local/admin/utils/freebsd/zfs_snap_make $SAVZFSBASE
+#  /usr/local/admin/utils/freebsd/zfs_snap_make $SAVZFSBASE
   TOTALS=$(($(date +%s) - $TBEGINALL))
   syslogue "info" "rsync_serveurs: THE END ($(($TOTALS / 3600))h$(($TOTALS % 3600 / 60))m$(($TOTALS % 3600 % 60))s)"
 fi
