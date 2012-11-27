@@ -99,7 +99,7 @@ waitupto() {
   MYMAX=${1:-$MAXJOBS}
   while [ $(($(pgrep -f '/bin/sh '$mydir'/rsync_serveurs.sh' | wc -l) + $(pgrep -f '/bin/sh '$mydir'/lib/save_one.sh' | wc -l))) -gt $(( MYMAX )) ]; do
     sleep 3
-  echo -n "."
+#  echo -n "."
   done
 }
 
@@ -166,12 +166,11 @@ else
   for file in $mydir/machines.d/*.conf; do
     waitupto
     serv=$(grep ^NAME $file|cut -d= -f2)
-    echo "rsync_serveurs: debut ${serv} "$(date)
+    syslogue "info" "rsync_serveurs: debut ${serv} "$(date)
     date >> /var/log/rsync_serveurs.$serv.log
     /bin/sh $mydir/lib/save_one.sh $file >> /var/log/rsync_serveurs.$serv.log 2>&1 &
   done
   waitupto 0
-#  /usr/local/admin/utils/freebsd/zfs_snap_make $SAVZFSBASE
   TOTALS=$(($(date +%s) - $TBEGINALL))
   syslogue "info" "rsync_serveurs: THE END ($(($TOTALS / 3600))h$(($TOTALS % 3600 / 60))m$(($TOTALS % 3600 % 60))s)"
 fi

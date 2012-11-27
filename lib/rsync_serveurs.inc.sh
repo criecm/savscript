@@ -203,17 +203,6 @@ fi" > $srvinfos 2> $TRACES/$NAME.init_srv
         fi
     fi
 
-    if [ -z "$FULLZFS" ]; then
-        RSYNC_SRV_BASE="${DEST}:"
-        get_rsync_daemon
-        if [ ! -z "$RSYNC_SRV_PID" ]; then
-            export RSYNC_COMMAND="$RSYNC --port=$RSYNC_PORT"
-        else
-            export RSYNC_RSH="$REMOTE_COMMAND"
-            export RSYNC_COMMAND="$RSYNC"
-        fi
-    fi
-
     if [ ! -z "$SYSVER" -a ! -z "$FSLIST" ]; then
         trap cleanup_srv 2 3
         return 0
@@ -222,10 +211,24 @@ fi" > $srvinfos 2> $TRACES/$NAME.init_srv
         return 1
     fi
 
+
+    if [ -z "$FULLZFS" ]; then
+        get_rsync_daemon
+        if [ ! -z "$RSYNC_SRV_PID" ] && $RSYNC --port=$RSYNC_PORT ${DEST}:: >>$TRACES/$NAME.init_srv 2>&1; then
+            export RSYNC_COMMAND="$RSYNC --port=$RSYNC_PORT"
+            RSYNC_SRV_BASE="${DEST}::root"
+        else
+            RSYNC_SRV_BASE="${DEST}:"
+            export RSYNC_RSH="$REMOTE_COMMAND"
+            export RSYNC_COMMAND="$RSYNC"
+        fi
+    fi
+
 }
 
 get_rsync_daemon() {
-    eval $($REMOTE_COMMAND $DEST 'RSYNC_SRV_DIR=/tmp/SAV.rsyncd
+    if [ "$RSYNC_DIRECT" = "YES" ]; then
+        eval $($REMOTE_COMMAND $DEST 'RSYNC_SRV_DIR=/tmp/SAV.rsyncd
 MYADDR=$(echo ${SSH_CONNECTION} | awk "{print \$3}")
 if [ -d $RSYNC_SRV_DIR ]; then
   test -f $RSYNC_SRV_DIR/rsyncd.pid && kill $(cat $RSYNC_SRV_DIR/rsyncd.pid)
@@ -247,14 +250,16 @@ log file = $RSYNC_SRV_DIR/rsyncd.log
 	hosts allow = ${SSH_CLIENT%% *}
 	read only = true
 EOF
-  if rsync --daemon --config=$RSYNC_SRV_DIR/rsyncd.conf; then
+  if rsync --daemon --config=$RSYNC_SRV_DIR/rsyncd.conf < /dev/null; then
     echo RSYNC_SRV_PID=$(cat $RSYNC_SRV_DIR/rsyncd.pid)
   fi
 fi' 2> $TRACES/$NAME.get_rsync_daemon)
-    if [ ! -z "$RSYNC_SRV_PID" ]; then
-        RSYNC_SRV_BASE="${DEST}::root"
-        return 0
+        if [ ! -z "$RSYNC_SRV_PID" ]; then
+            RSYNC_SRV_BASE="${DEST}::root"
+            return 0
+        fi
     fi
+    echo "RSYNC_DIRECT=$RSYNC_DIRECT" >> $TRACES/$NAME.get_rsync_daemon
     return 1;
 }
 
@@ -351,7 +356,7 @@ init_zfs_dest() {
         # en cas de montage d'un zfs dans une arborescence !zfs
         # on cree les elements intermediaires sans montage
         # (l'ordre *doit* etre du plus court au plus long)
-        $myzpath=$myzfsdest
+        myzpath=$myzfsdest
         while ! zfs list -H -o name ${myzpath%/*}; do
             ztocreate=${myzpath%/*}" "$ztocreate
             myzpath=${myzpath%/*}
