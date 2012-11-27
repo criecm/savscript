@@ -155,13 +155,13 @@ init_srv() {
         $REMOTE_COMMAND $DEST "echo \"SYSTEM=\$(uname -s)\";
 SYSVER=\$(uname -r)
 echo \"SYSVER=\$SYSVER\";
-echo \"FSLIST=\\\"\$(mount -t $FSTYPES | sed 's@^.*on \(/[^ ]*\) \((\|type \)\([a-zA-Z0-9]\{1,\}\).*\$@\3:\1@' | sort -t: -k2)\\\"\";
+echo \"FSLIST=\\\"\$(mount -t $FSTYPES | sed -r 's@^.*on (/[^ ]*) (\(|type )([a-zA-Z0-9]+).*\$@\3:\1@' | sort -t: -k2)\\\"\";
 if [ \"\$(uname -s)\" = \"FreeBSD\" -a \${SYSVER%%.*} -gt 6 ]; then
   echo JAILS=\\\"\$(/usr/sbin/jls | awk '(\$1 ~ /^[0-9]+\$/) { printf(\"%s\\\n\",\$4); }')\\\";
   if [ \$(mount -t zfs | wc -l) -gt 0 ]; then
     echo ZPOOLS=\\\"\$(/sbin/zpool list -H -o name)\\\";
     echo ZFSSLASH=\\\"\$(zfs list -H -omountpoint,name / | grep 'legacy' | awk '{print \$2}')\\\";
-    echo ZFSFSES=\\\"\$(zfs list -H -t filesystem -o mountpoint,name | sed 's/[[:space:]]\{1,\}/|/')\\\";
+    echo ZFSFSES=\\\"\$(zfs list -H -t filesystem -o mountpoint,name | sed -r 's/[[:space:]]+/|/')\\\";
   fi
 fi" > $srvinfos 2> $TRACES/$NAME.init_srv
         . $srvinfos > $TRACES/$NAME.init_srv 2>&1
