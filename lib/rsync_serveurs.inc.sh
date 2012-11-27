@@ -155,13 +155,13 @@ init_srv() {
         $REMOTE_COMMAND $DEST "echo \"SYSTEM=\$(uname -s)\";
 SYSVER=\$(uname -r)
 echo \"SYSVER=\$SYSVER\";
-echo \"FSLIST=\\\"\$(mount -t $FSTYPES | sed -E 's@^.*on (/[^ ]*) (\(|type )([a-zA-Z0-9]+).*\$@\3:\1@' | sort -t: -k2)\\\"\";
+echo \"FSLIST=\\\"\$(mount -t $FSTYPES | sed 's@^.*on \(/[^ ]*\) \((\|type \)\([a-zA-Z0-9]\{1,\}\).*\$@\3:\1@' | sort -t: -k2)\\\"\";
 if [ \"\$(uname -s)\" = \"FreeBSD\" -a \${SYSVER%%.*} -gt 6 ]; then
   echo JAILS=\\\"\$(/usr/sbin/jls | awk '(\$1 ~ /^[0-9]+\$/) { printf(\"%s\\\n\",\$4); }')\\\";
   if [ \$(mount -t zfs | wc -l) -gt 0 ]; then
     echo ZPOOLS=\\\"\$(/sbin/zpool list -H -o name)\\\";
     echo ZFSSLASH=\\\"\$(zfs list -H -omountpoint,name / | grep 'legacy' | awk '{print \$2}')\\\";
-    echo ZFSFSES=\\\"\$(zfs list -H -t filesystem -o mountpoint,name | sed -E 's/[[:space:]]+/|/')\\\";
+    echo ZFSFSES=\\\"\$(zfs list -H -t filesystem -o mountpoint,name | sed 's/[[:space:]]\{1,\}/|/')\\\";
   fi
 fi" > $srvinfos 2> $TRACES/$NAME.init_srv
         . $srvinfos > $TRACES/$NAME.init_srv 2>&1
@@ -205,7 +205,6 @@ fi" > $srvinfos 2> $TRACES/$NAME.init_srv
 
     if [ ! -z "$SYSVER" -a ! -z "$FSLIST" ]; then
         trap cleanup_srv 2 3
-        return 0
     else
         warn_admin 1 "init_srv($1)" "$TRACES/$NAME.init_srv" "Impossible d'initialiser la sauvegarde"
         return 1
@@ -224,6 +223,7 @@ fi" > $srvinfos 2> $TRACES/$NAME.init_srv
         fi
     fi
 
+    return 0
 }
 
 get_rsync_daemon() {
@@ -290,7 +290,10 @@ cleanup_srv() {
 ### ZFS destination ###
 #######################
 is_zfs_path() {
-    expr "$1" : "\/" > /dev/null && return 1
+    case "$1" in
+    /*) return 0 ;;
+    *) return 1 ;;
+    esac
     return 0
 }
 
