@@ -5,12 +5,10 @@
 # Principe: un script/serveur dans un repertoire rsync_serveurs/
 #
 # TODOS: 
-#  - script ajout machine simple (dialog?)
 #  - MAJ script restauration (ZFS slash/root, verifier autres systemes, pb cle ssh, orig:mountpoint)
 #  - script restauration de jail
 #  - menage snapshots (prevu pour un snapshot recursif -> c'est a lui de l'etre)
-#  - gestion syslog (utiliser un local* ou ?, propager a zfs_sync_vol)
-#  - envoi de problemes a $ADMINMAIL
+#  - UFS: faire les snapshots au debut, les monter dans /tmp/mntsav (ou /mnt/tmpsav?) et y lancer rsyncd
 #
 PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin
 mydir=$(dirname $0)
