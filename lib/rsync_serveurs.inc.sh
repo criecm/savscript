@@ -54,7 +54,7 @@ rsync_it() {
     doit $RSYNC_COMMAND $RSYNC_OPTS $(rsync_excludes_for ${1}) ${RSYNC_SRV_BASE}${1} ${2}
     res=$?
     case $res in
-        0|24)
+        0|23|24)
             return 0
         ;;
         *)
@@ -79,6 +79,10 @@ rsync_excludes_for() {
     test -z "$EXCLUDES" && return 1
     for x in $EXCLUDES; do
         case $x in
+        /)
+            syslogue "error" "excluding / ?"
+            tmpargs=$tmpargs"--exclude \"/\""
+        ;;
         /*)
             expr "$1" : "$(echo $x|sed 's@/@\\/@g; s@\.@\\.@g;')" >/dev/null && tmpargs=$tmpargs"--exclude \"${x#$1}\" "
         ;;
@@ -152,16 +156,18 @@ srvinfos=$DESTDIR.infos
 init_srv() {
     if fping -q $DEST; then
         test -f $srvinfos && mv $srvinfos $srvinfos.last
-        $REMOTE_COMMAND $DEST "echo \"SYSTEM=\$(uname -s)\";
+        $REMOTE_COMMAND $DEST "SYSTEM=\$(uname -s);
 SYSVER=\$(uname -r)
+[ \"\$SYSTEM\" = \"FreeBSD\" ] && SEDOPT=-E || SEDOPT=-r
+echo \"SYSTEM=\$SYSTEM\";
 echo \"SYSVER=\$SYSVER\";
-echo \"FSLIST=\\\"\$(mount -t $FSTYPES | sed -r 's@^.*on (/[^ ]*) (\(|type )([a-zA-Z0-9]+).*\$@\3:\1@' | sort -t: -k2)\\\"\";
+echo \"FSLIST=\\\"\$(mount -t $FSTYPES | sed \$SEDOPT 's@^.*on (/[^ ]*) (\(|type )([a-zA-Z0-9]+).*\$@\3:\1@' | sort -t: -k2)\\\"\";
 if [ \"\$(uname -s)\" = \"FreeBSD\" -a \${SYSVER%%.*} -gt 6 ]; then
   echo JAILS=\\\"\$(/usr/sbin/jls | awk '(\$1 ~ /^[0-9]+\$/) { printf(\"%s\\\n\",\$4); }')\\\";
   if [ \$(mount -t zfs | wc -l) -gt 0 ]; then
     echo ZPOOLS=\\\"\$(/sbin/zpool list -H -o name)\\\";
     echo ZFSSLASH=\\\"\$(zfs list -H -omountpoint,name / | grep 'legacy' | awk '{print \$2}')\\\";
-    echo ZFSFSES=\\\"\$(zfs list -H -t filesystem -o mountpoint,name | sed -r 's/[[:space:]]+/|/')\\\";
+    echo ZFSFSES=\\\"\$(zfs list -H -t filesystem -o mountpoint,name | sed \$SEDOPT 's/[[:space:]]+/|/')\\\";
   fi
 fi" > $srvinfos 2> $TRACES/$NAME.init_srv
         . $srvinfos > $TRACES/$NAME.init_srv 2>&1
@@ -169,7 +175,7 @@ fi" > $srvinfos 2> $TRACES/$NAME.init_srv
         aiiie "Serveur $DEST down. Pas de sauvegarde"
         return 1
     fi
-
+    
     ### on a les infos du serveur: on les digere
     if [ "$SYSTEM" = "FreeBSD" ]; then
         #on cree le fichier d'exclusions pour zfs
