@@ -219,7 +219,7 @@ fi" > $srvinfos 2> $TRACES/$NAME.init_srv
 
     if [ -z "$FULLZFS" ]; then
         get_rsync_daemon
-        if [ ! -z "$RSYNC_SRV_PID" ] && $RSYNC --port=$RSYNC_PORT ${DEST}:: >>$TRACES/$NAME.init_srv 2>&1; then
+        if [ ! -z "$RSYNC_SRV_PID" ] && $RSYNC --port=$RSYNC_PORT ${DEST}:: >/dev/null 2>&1; then
             export RSYNC_COMMAND="$RSYNC --port=$RSYNC_PORT"
             RSYNC_SRV_BASE="${DEST}::root"
         else
@@ -271,7 +271,7 @@ fi' 2> $TRACES/$NAME.get_rsync_daemon)
 
 cleanup_srv() {
     if [ ! -z "$RSYNC_SRV_PID" ]; then
-        CLEANUP_COMMAND="test -f /tmp/SAV.rsyncd/rsyncd.log && cat /tmp/SAV.rsyncd/rsyncd.log; kill $RSYNC_SRV_PID && rm -rf /tmp/SAV.rsyncd;"
+        CLEANUP_COMMAND="test -f /tmp/SAV.rsyncd/rsyncd.log && cat /tmp/SAV.rsyncd/rsyncd.log; kill $RSYNC_SRV_PID; rm -rf /tmp/SAV.rsyncd;"
         unset RSYNC_SRV_PID
     fi
     if [ ! -z "$ZFS_PRESNAPS" ]; then
@@ -389,6 +389,9 @@ init_zfs_dest() {
         if [ "$(zfs get -H -ovalue orig:mountpoint $myzfsdest)" != "$1" ]; then
             doit zfs set orig:mountpoint=$1 $myzfsdest
         fi
+        if [ "$(zfs get -H -o value readonly ${myzfsdest})" != "off" ]; then
+            shellex zfs set readonly=off $myzfsdest
+        fi
         doit zfs mount $myzfsdest
     fi
 }
@@ -419,21 +422,23 @@ get_ufs() {
     UFSSNAPNAME=rsync.$(date +%Y%m%d-%H%M%S)
     UFSMOUNTDIR=/tmp/mntsav_$(hostname -s)$(echo ${dir%/}|sed 's@/@_@g')
     # creation du snapshot a la source
-    UFSTS=$($REMOTE_COMMAND $DEST "\
-        if [ -d \"${dir}\" ] && [ -d ${dir%/}/.snap ]; then \
-          if mount -u -o snapshot ${dir%/}/.snap/$UFSSNAPNAME ${dir}; then \
-            TS=\$(TZ=UTC date +%s)
-            mkdir -p $UFSMOUNTDIR; \
-            if mount -r /dev/\$(mdconfig -a -t vnode -o readonly -f ${dir%/}/.snap/$UFSSNAPNAME) $UFSMOUNTDIR; then \
-              echo \$TS; \
-            else \
-              mdconfig -l -v | grep $UFSSNAPNAME | cut -f1 | xargs -L1 mdconfig -d -u ; \
-              rm -f ${dir%/}/.snap/$UFSSNAPNAME 2>/dev/null; \
-            fi \
-          else \
-            test -f ${dir%/}/.snap/$UFSSNAPNAME && rm -f ${dir%/}/.snap/$UFSSNAPNAME; \
-          fi \
-        fi") >> $L 2>&1 || return 1
+    if [ ${SYSVER%%.*} -gt 5 ]; then
+        UFSTS=$($REMOTE_COMMAND $DEST "\
+            if [ -d \"${dir}\" ] && [ -d ${dir%/}/.snap ]; then \
+              if mount -u -o snapshot ${dir%/}/.snap/$UFSSNAPNAME ${dir}; then \
+                TS=\$(TZ=UTC date +%s)
+                mkdir -p $UFSMOUNTDIR; \
+                if mount -r /dev/\$(mdconfig -a -t vnode -o readonly -f ${dir%/}/.snap/$UFSSNAPNAME) $UFSMOUNTDIR; then \
+                  echo \$TS; \
+                else \
+                  mdconfig -l -v | grep $UFSSNAPNAME | cut -f1 | xargs -L1 mdconfig -d -u ; \
+                  rm -f ${dir%/}/.snap/$UFSSNAPNAME 2>/dev/null; \
+                fi \
+              else \
+                test -f ${dir%/}/.snap/$UFSSNAPNAME && rm -f ${dir%/}/.snap/$UFSSNAPNAME; \
+              fi \
+            fi") >> $L 2>&1 || return 1
+    fi
     init_zfs_dest $dir $2 $3
     if [ ! -z "$UFSTS" ]; then
         rsync_it ${UFSMOUNTDIR}/ $mydestdir/ >> $L 2>&1
@@ -442,11 +447,11 @@ get_ufs() {
         $REMOTE_COMMAND $DEST "umount $UFSMOUNTDIR || ( fuser -k -m $UFSMOUNTDIR ; umount -f $UFSMOUNTDIR ); \
             mdconfig -l -v | fgrep ${dir%/}/.snap/$UFSSNAPNAME | cut -f1 | xargs -L1 mdconfig -d -u && rm -f ${dir%/}/.snap/$UFSSNAPNAME && rmdir $UFSMOUNTDIR;" || syslogue "error" "AIIIE: snapshot impossible a supprimer: ${dir%/}/$UFSSNAPNAME monte sur $UFSMOUNTDIR" >> $L 2>&1
     else
-        syslog "error" "get_ufs_snap($dir): pas reussi a utiliser un snapshot :-/"
+        [ ${SYSVER%%.*} -gt 5 ] && syslogue "notice" "get_ufs($dir): pas reussi a utiliser un snapshot :-/"
         rsync_it ${dir%/}/ $mydestdir/ >> $L 2>&1
         ret=$?
     fi
-    shellex $ZFS_SNAP_MAKE -q -s $UFSTS $myzfsdest
+    shellex $ZFS_SNAP_MAKE -q ${UFSTS:+-s $UFSTS} $myzfsdest
     if [ $ret -ne 0 ]; then
         syslog "error" "Probleme a la sauvegarde de ${DEST}:${dir} (UFS+snapshot)"
         warn_admin $ret "get_ufs($*)" $L "Pb avec $RSYNC_COMMAND$RSYNC_DSTBASE$UFSMOUNTDIR"
@@ -479,6 +484,9 @@ get_zfs() {
         fi
         warn_admin $ret "get_zfs($*)" $L "Pb a la synchro du volume $1"
     fi
+    # mettre le flag "readonly"
+    zfs get -H -r -o name,value -t filesystem -r readonly ${d} | grep 'off$' | cut -f 1 | xargs -L1 zfs set readonly=on
+    shellex zfs set readonly=on ${d} >> $L 2>&1
     now_exclude_zfs $s
     say_end_with $ret
 }
