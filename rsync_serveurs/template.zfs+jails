@@ -14,8 +14,8 @@ jailzfsbase=disques/sav/jails
 if fping -q $srv; then
         zfs list $zfsdest || zfs create $zfsdest
 	echo -n "zfssync $srv: "
-	#$RSYNC_RSH $srv "/sbin/zpool list -H -o name"
-	JAILVOLS=$($RSYNC_RSH $srv "if [ \"\$(uname -s)\" = \"FreeBSD\" ]; then \
+	#$REMOTE_COMMAND $srv "/sbin/zpool list -H -o name"
+	JAILVOLS=$($REMOTE_COMMAND $srv "if [ \"\$(uname -s)\" = \"FreeBSD\" ]; then \
 		jls | awk '(\$1 ~ /^[0-9]+\$/) { print \$4 }'; else echo ''; fi | \
 			while read dir; do mount -tzfs | grep 'on '\$dir' ' | cut -d' ' -f1; done")
 	for jailvol in $JAILVOLS; do
@@ -35,14 +35,14 @@ if fping -q $srv; then
 		# verifier que le jail est bien exclus du reste
 		grep -q ^$jailvol$ $excludefrom 2>/dev/null || echo $jailvol >> $excludefromhost
 		eval "/usr/local/admin/utils/freebsd/zfs_sync_vol -k /root/.ssh/id_rsyncsav -C -a $JZOPTS $jailvol@$srv $jailzfsdest"
-		$RSYNC_RSH $srv "cat /usr/local/etc/ezjail/$jail" > /sav/jails/$jail.ezjail
-		$RSYNC_RSH $srv "cat /etc/fstab.$jail" > /sav/jails/$jail.fstab
+		$REMOTE_COMMAND $srv "cat /usr/local/etc/ezjail/$jail" > /sav/jails/$jail.ezjail
+		$REMOTE_COMMAND $srv "cat /etc/fstab.$jail" > /sav/jails/$jail.fstab
 		echo "$srv" > /sav/jails/$jail.host
 		echo -n ". "
 	done
-	$RSYNC_RSH $srv "/sbin/zfs list" > /sav/$srv.zfslist
+	$REMOTE_COMMAND $srv "/sbin/zfs list" > /sav/$srv.zfslist
 	test -f $excludefromhost && ZOPTS="-x $excludefromhost"
-	for zpool in $($RSYNC_RSH $srv "/sbin/zpool list -H -o name"); do
+	for zpool in $($REMOTE_COMMAND $srv "/sbin/zpool list -H -o name"); do
 		if [ -f $excludefromhost ] && ! grep -q ^$zpool$ $excludefromhost; then
 			echo -n "$zpool"
 			eval "/usr/local/admin/utils/freebsd/zfs_sync_vol -k /root/.ssh/id_rsyncsav -C -a $ZOPTS $zpool@$srv $zfsdest"

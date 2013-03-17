@@ -9,10 +9,10 @@ jailzfsbase=disques/sav/jails
 if fping -q $srv; then
         zfs list $zfsdest || zfs create $zfsdest
 	echo -n "zfssync $srv: "
-	#$RSYNC_RSH $srv "/sbin/zpool list -H -o name"
-	$RSYNC_RSH $srv "/sbin/zfs list" > /sav/$srv.zfslist
+	#$REMOTE_COMMAND $srv "/sbin/zpool list -H -o name"
+	$REMOTE_COMMAND $srv "/sbin/zfs list" > /sav/$srv.zfslist
 	test -f $excludefrom && ZOPTS="-x $excludefrom"
-	for zpool in $($RSYNC_RSH $srv "/sbin/zpool list -H -o name"); do
+	for zpool in $($REMOTE_COMMAND $srv "/sbin/zpool list -H -o name"); do
 		if [ -f $excludefrom ] && ! grep -q ^$zpool$ $excludefrom; then
 			echo -n "$zpool"
 			eval "/usr/local/admin/utils/freebsd/zfs_sync_vol -k /root/.ssh/id_rsyncsav -C -a $ZOPTS $zpool@$srv $zfsdest"

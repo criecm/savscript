@@ -2,6 +2,7 @@
 srv=$(/usr/bin/basename $0 .rsync)
 excludes=""
 excludefrom=${0%.rsync}.excludes
+export RSYNC_RSH="$REMOTE_COMMAND"
 
 is_excluded() {
   test -f $excludefrom || return 1
