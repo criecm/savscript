@@ -95,7 +95,7 @@ fi
 ## fonction de parallelisation
 waitupto() {
   MYMAX=${1:-$MAXJOBS}
-  while [ $(($(pgrep -f '/bin/sh '$mydir'/rsync_serveurs.sh' | wc -l) + $(pgrep -f '/bin/sh '$mydir'/lib/save_one.sh' | wc -l))) -gt $(( MYMAX )) ]; do
+  while [ $(( $(pgrep -f '/bin/sh '$mydir'/lib/save_one.sh' | wc -l) )) -gt $(( MYMAX )) ]; do
     sleep 3
 #  echo -n "."
   done
@@ -117,42 +117,20 @@ if [ $# -gt 0 ]; then
           err="Cannot create lockfile $lockfile"
         ;;
         75)
-          err="$mydir/rsync_serveurs/$1.rsync already running ($lockfile)"
+          err="$mydir/lib/save_one.sh $MACHINESDIR/$1.conf already running ($lockfile)"
         ;;
         71)
           err="System error (?)"
         ;;
         70)
-          err="Problem with $mydir/rsync_serveurs/$1.rsync"
-        ;;
-      esac
-      if [ ! -z "$err" ]; then
-        syslogue "error" "$err"
-      fi
-    # OLD
-    elif [ -f $mydir/rsync_serveurs/$1.rsync ]; then
-      lockfile=${TMPDIR:-/tmp}/rsync.$1.encours
-      err=""
-      time lockf -t 0 $lockfile /bin/sh ${DEBUGADONF:+-x }$mydir/rsync_serveurs/$1.rsync
-      case $? in
-        73)
-          err="Cannot create lockfile $lockfile"
-        ;;
-        75)
-          err="$mydir/rsync_serveurs/$1.rsync already running ($lockfile)"
-        ;;
-        71)
-          err="System error (?)"
-        ;;
-        70)
-          err="Problem with $mydir/rsync_serveurs/$1.rsync"
+          err="Problem with $mydir/lib/save_one.sh $MACHINESDIR/$1.conf"
         ;;
       esac
       if [ ! -z "$err" ]; then
         syslogue "error" "$err"
       fi
     else
-      syslogue "error" "ni $MACHINESDIR/$1.conf ni $mydir/rsync_serveurs/$1.rsync n'existent."
+      syslogue "error" "$MACHINESDIR/$1.conf n'existe pas."
     fi
     shift
   done

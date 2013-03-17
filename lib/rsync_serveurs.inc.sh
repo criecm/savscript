@@ -239,6 +239,7 @@ MYADDR=$(echo ${SSH_CONNECTION} | awk "{print \$3}")
 if [ -d $RSYNC_SRV_DIR ]; then
   test -f $RSYNC_SRV_DIR/rsyncd.pid && kill $(cat $RSYNC_SRV_DIR/rsyncd.pid)
   rm -rf $RSYNC_SRV_DIR
+  pgrep -f "rsync.*/tmp/SAV" && pkill -9 -f "rsync.*/tmp/SAV"
 fi
 if mkdir $RSYNC_SRV_DIR; then
   cat > $RSYNC_SRV_DIR/rsyncd.conf << EOF
@@ -257,7 +258,7 @@ log file = $RSYNC_SRV_DIR/rsyncd.log
 	read only = true
 EOF
   if rsync --daemon --config=$RSYNC_SRV_DIR/rsyncd.conf < /dev/null; then
-    echo RSYNC_SRV_PID=$(cat $RSYNC_SRV_DIR/rsyncd.pid)
+    echo export RSYNC_SRV_PID=$(cat $RSYNC_SRV_DIR/rsyncd.pid)
   fi
 fi' 2> $TRACES/$NAME.get_rsync_daemon)
         if [ ! -z "$RSYNC_SRV_PID" ]; then
@@ -266,12 +267,13 @@ fi' 2> $TRACES/$NAME.get_rsync_daemon)
         fi
     fi
     echo "RSYNC_DIRECT=$RSYNC_DIRECT" >> $TRACES/$NAME.get_rsync_daemon
+    echo "RSYNC_SRV_PID=$RSYNC_SRV_PID" >> $TRACES/$NAME.get_rsync_daemon
     return 1;
 }
 
 cleanup_srv() {
     if [ ! -z "$RSYNC_SRV_PID" ]; then
-        CLEANUP_COMMAND="test -f /tmp/SAV.rsyncd/rsyncd.log && cat /tmp/SAV.rsyncd/rsyncd.log; kill $RSYNC_SRV_PID; rm -rf /tmp/SAV.rsyncd;"
+        CLEANUP_COMMAND="test -f /tmp/SAV.rsyncd/rsyncd.log && cat /tmp/SAV.rsyncd/rsyncd.log; kill \$(cat /tmp/SAV.rsyncd/rsyncd.pid); rm -rf /tmp/SAV.rsyncd;"
         unset RSYNC_SRV_PID
     fi
     if [ ! -z "$ZFS_PRESNAPS" ]; then
@@ -390,7 +392,7 @@ init_zfs_dest() {
             doit zfs set orig:mountpoint=$1 $myzfsdest
         fi
         if [ "$(zfs get -H -o value readonly ${myzfsdest})" != "off" ]; then
-            shellex zfs set readonly=off $myzfsdest
+            zfs set readonly=off $myzfsdest
         fi
         doit zfs mount $myzfsdest
     fi
@@ -414,7 +416,7 @@ get_fs() {
     say_end_with $ret
 }
 
-# usage: get_ufs srcdir
+# usage: get_ufs srcdir [[dstdir] [zfsdest]]
 get_ufs() {
     dir=$1
     say_begin "UFS:$dir"
@@ -464,6 +466,7 @@ get_zfs() {
     if [ "$1" = "legacy" ]; then
         return
     fi
+#    echo "get_zfs $*" >> /tmp/$(echo "$DEST $*" | sed 's/[^-a-zA-Z0-9]/_/g')
     ztarget=$1
     d=${2:-$(get_zfsdest_for $ztarget)}
     s=${3:-$(get_zfs_src_for $ztarget)}
@@ -486,7 +489,7 @@ get_zfs() {
     fi
     # mettre le flag "readonly"
     zfs get -H -r -o name,value -t filesystem -r readonly ${d} | grep 'off$' | cut -f 1 | xargs -L1 zfs set readonly=on
-    shellex zfs set readonly=on ${d} >> $L 2>&1
+    zfs set readonly=on ${d} >> $L 2>&1
     now_exclude_zfs $s
     say_end_with $ret
 }
