@@ -164,6 +164,9 @@ echo \"SYSVER=\$SYSVER\";
 echo \"FSLIST=\\\"\$(mount -t $FSTYPES | sed \$SEDOPT 's@^.*on (/[^ ]*) (\(|type )([a-zA-Z0-9]+).*\$@\3:\1@' | sort -t: -k2)\\\"\";
 if [ \"\$(uname -s)\" = \"FreeBSD\" -a \${SYSVER%%.*} -gt 6 ]; then
   echo JAILS=\\\"\$(/usr/sbin/jls | awk '(\$1 ~ /^[0-9]+\$/) { printf(\"%s\\\n\",\$4); }')\\\";
+  if [ -x /usr/local/bin/ezjail-admin ]; then
+    echo INACTIVEJAILS=\\\"\$(cd /usr/local/etc/ezjail; ls | fgrep norun | xargs -L1 awk 'BEGIN { FS=\"\\\"\" } (\$1 ~ /rootdir/) { print \$2 }')\\\"
+  fi
   if [ \$(mount -t zfs | wc -l) -gt 0 ]; then
     echo ZPOOLS=\\\"\$(/sbin/zpool list -H -o name)\\\";
     echo ZFSSLASH=\\\"\$(zfs list -H -omountpoint,name / | grep 'legacy' | awk '{print \$2}')\\\";
@@ -180,6 +183,10 @@ fi" > $srvinfos 2> $TRACES/$NAME.init_srv
     if [ "$SYSTEM" = "FreeBSD" ]; then
         #on cree le fichier d'exclusions pour zfs
         test -f $excludefrom.zfs && rm $excludefrom.zfs
+        # si jails inactifs, on les exclue
+        if [ ! -z "$INACTIVEJAILS" ]; then
+            EXCLUDES=$EXCLUDES" "$INACTIVEJAILS
+        fi
         # traduit les exclusions de repertoires en volumes zfs
         if [ ! -z "$EXCLUDES" -a ! -z "$ZFSFSES" ]; then
             for zfsdesc in $ZFSFSES; do
@@ -489,7 +496,10 @@ get_zfs() {
     fi
     # mettre le flag "readonly"
     zfs get -H -r -o name,value -t filesystem -r readonly ${d} | grep 'off$' | cut -f 1 | xargs -L1 zfs set readonly=on
-    zfs set readonly=on ${d} >> $L 2>&1
+    zfs get -Hp -oname,value,source -tfilesystem -r mountpoint ${d} | grep 'received$' | while read vol val src; do
+      zfs set mountpoint=$val $vol
+      zfs inherit orig:mountpoint $vol
+    done
     now_exclude_zfs $s
     say_end_with $ret
 }
