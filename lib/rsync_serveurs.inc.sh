@@ -508,6 +508,13 @@ zfs_presnap() {
     ZFS_PRESNAPS=$ZFS_PRESNAPS" "$($REMOTE_COMMAND $DEST "SNAP=\$(TZ=UTC date +GMT-%Y.%m.%d-%H.%M.%S); zfs snapshot -r ${1}@\$SNAP && echo ${1}@\$SNAP")
 }
 
+is_fstype() {
+    for fst in $FSLIST; do
+        [ "$fst" = "${1}:${2}" ] && return 0
+    done
+    return 1
+}
+
 #####################
 ### Jails FreeBSD ###
 #####################
@@ -543,19 +550,21 @@ get_jail() {
     zjdest=$JAILSZFSDEST/$curjail
     jdest=$JAILSDESTDIR/$curjail
 
-    if echo "$FSLIST" | fgrep -q "zfs:$jaildir" >/dev/null; then
+    if is_fstype zfs $jaildir; then
         get_zfs $jaildir $JAILSZFSDEST/$curjail
-    else
+        now_exclude_zfs $jaildir
+    elif is_fstype ufs $jaildir; then
         get_ufs $jaildir $JAILSDESTDIR/$curjail $JAILSZFSDEST/$curjail
+    else
+        get_fs $jaildir $JAILSDESTDIR/$curjail
     fi
-    now_exclude_zfs $jaildir
     now_exclude $jaildir
 
     init_zfs_dest ${jaildir}-config $JAILSDESTDIR/${curjail}-config $JAILSZFSDEST/${curjail}-config
     confdest="${jdest}-config"
     doit $REMOTE_COMMAND $DEST "mkdir -p /tmp/${curjail}-config; \
         ( [ -f /usr/local/etc/ezjail/${curjail} ] && cp /usr/local/etc/ezjail/${curjail} /tmp/${curjail}-config ) || \
-            fgrep ^jail_${curjail} /etc/rc.conf > /tmp/${curjail}-config/rc.conf; \
+            grep ^jail_${curjail} /etc/rc.conf > /tmp/${curjail}-config/rc.conf; \
         ( [ -f /etc/fstab.$curjail ] && cp /etc/fstab.$curjail /tmp/${curjail}-config ) || \
             ( [ -f ${dir%$curjail}fstab.$curjail ] && cp ${dir%$curjail}fstab.$curjail /tmp/${curjail}-config ); \
         tar -C /tmp/${curjail}-config -cf - .; rm -rf /tmp/${curjail}-config" | tar -C $confdest -xf - >> $L 2>&1

@@ -77,7 +77,7 @@ if [ -e "$TRACES" ]; then
 fi
 mkdir $TRACES
 
-if [ $DEBUG -gt 1 ]; then
+if [ $DEBUG -gt 3 ]; then
   DEBUGADONF=1
   if [ $DEBUG -ge 2 ]; then
     MAXJOBS=1
