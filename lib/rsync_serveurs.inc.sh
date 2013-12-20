@@ -173,7 +173,7 @@ if [ \"\$(uname -s)\" = \"FreeBSD\" -a \${SYSVER%%.*} -gt 6 ]; then
     echo ZFSFSES=\\\"\$(zfs list -H -t filesystem -o mountpoint,name | sed \$SEDOPT 's/[[:space:]]+/|/')\\\";
   fi
 fi" > $srvinfos 2> $TRACES/$NAME.init_srv
-        . $srvinfos > $TRACES/$NAME.init_srv 2>&1
+        . $srvinfos >> $TRACES/$NAME.init_srv 2>&1
     else
         aiiie "Serveur $DEST down. Pas de sauvegarde"
         return 1
@@ -219,7 +219,7 @@ fi" > $srvinfos 2> $TRACES/$NAME.init_srv
     if [ ! -z "$SYSVER" -a ! -z "$FSLIST" ]; then
         trap cleanup_srv 2 3
     else
-        warn_admin 1 "init_srv($1)" "$TRACES/$NAME.init_srv" "Impossible d'initialiser la sauvegarde"
+        warn_admin 1 "init_srv($*)" "$TRACES/$NAME.init_srv" "Impossible d'initialiser la sauvegarde"
         return 1
     fi
 
@@ -567,6 +567,7 @@ get_jail() {
             grep ^jail_${curjail} /etc/rc.conf > /tmp/${curjail}-config/rc.conf; \
         ( [ -f /etc/fstab.$curjail ] && cp /etc/fstab.$curjail /tmp/${curjail}-config ) || \
             ( [ -f ${dir%$curjail}fstab.$curjail ] && cp ${dir%$curjail}fstab.$curjail /tmp/${curjail}-config ); \
+        hostname > /tmp/${curjail}-config/host; \
         tar -C /tmp/${curjail}-config -cf - .; rm -rf /tmp/${curjail}-config" | tar -C $confdest -xf - >> $L 2>&1
     cret=$?
     if [ $cret -ne 0 ]; then
