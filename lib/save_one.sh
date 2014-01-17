@@ -4,7 +4,7 @@
 #
 if [ -z "$CONFIG_LOADED" ]; then
   echo "ne pas utiliser directement"
-  echo " utiliser $mydir/rsync_serverurs.sh machine"
+  echo " utiliser $mydir/rsync_serveurs.sh machine"
   exit 1
 elif [ $# -ne 1 -o ! -f "$1" ]; then
   syslogue "error" "Argument \"$1\" non valide"
@@ -18,8 +18,6 @@ JAILSZFSDEST=${JAILSZFSDEST:-"$SAVZFSBASE/jails"}
 JAILSDESTDIR=${JAILSDESTDIR:-"$SAVDESTBASE/jails"}
 RSYNC_PORT=${RSYNC_PORT:-42873}
 RSYNC_DIRECT=${RSYNC_DIRECT:-"YES"}
-
-ZFS_SNAP_MAKE=${ZFS_SNAP_MAKE:-$(which zfs_snap_make)}
 
 . $mydir/lib/rsync_serveurs.inc.sh
 
@@ -77,7 +75,7 @@ if init_srv $DEST; then
         fi
         # remontage dans l'ordre si / a un mountpoint 'legacy' (monte par fstab)
         if [ ! -z "$ZFSSLASH" -a -z "$MOUNTPROBLEM" ]; then
-            syslogue "info" "($NAME) FULLZFS: remontage dans l'ordre (racine en ZFS 'legacy'"
+            syslogue "info" "($NAME) FULLZFS: remontage dans l'ordre (racine en ZFS 'legacy')"
             zfs list -H -o canmount,mountpoint,name,mounted -S name -r $ZFSDEST | awk '($1 ~ /^on$/ && $2 !~ /^legacy$/ && $4 ~ /^yes$/) { print $3 }' | xargs -L1 zfs umount
             mount | grep '^'$ZFSDEST'.* on '$DESTDIR | awk '{print $1}' | sort -r | xargs -L1 umount -f
             mount -tzfs $ZFSDEST/${ZFSSLASH#*/} $DESTDIR

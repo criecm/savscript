@@ -6,12 +6,15 @@
 . /usr/local/admin/utils/common/common.sh.inc
 . $mydir/lib/log.inc.sh
 
+#ZFS_SYNC_VOL=${ZFS_SYNC_VOL:-$(which zfs_sync_vol)}
+#ZFS_SNAP_MAKE=${ZFS_SNAP_MAKE:-$(which zfs_snap_make)}
 excludefrom=$TRACES/$NAME.excludes
-ZFS_SYNC_VOL=$(which zfs_sync_vol)
 ZEXCLUDES="-x $excludefrom.zfs"
 #ZOPTS="-k $SSH_KEY -C -m 'GMT-%Y.%m.%d-%H.%M.%S' -I"
-ZOPTS="-k $SSH_KEY -C -I -u"
-ZRECURSION="-a"
+ZOPTS="-k $SSH_KEY -CUBIu"
+ZRECURSION="-R"
+# menage snapshots ZFS (voir zfs_sync_vol)
+export CLEANOLDSNAPSTOO=YO 
 
 if [ $DEBUG -ge 4 ]; then
     ZOPTS=$ZOPTS" -vv"
@@ -84,7 +87,7 @@ rsync_excludes_for() {
             tmpargs=$tmpargs"--exclude \"/\""
         ;;
         /*)
-            expr "$1" : "$(echo $x|sed 's@/@\\/@g; s@\.@\\.@g;')" >/dev/null && tmpargs=$tmpargs"--exclude \"${x#$1}\" "
+            expr "$x" : "$(echo $1 | sed 's@/@\\/@g; s@\.@\\.@g;')" >/dev/null && tmpargs=$tmpargs"--exclude \"${x#$1}\" "
         ;;
         *)
             tmpargs=$tmpargs"--exclude \"$x\" "
@@ -196,8 +199,8 @@ fi" > $srvinfos 2> $TRACES/$NAME.init_srv
         for fsdesc in $FSLIST; do
             case ${fsdesc%:*} in
                 zfs) ZFS=YES ;;
-                ufs) UFS=YES; NONZFS=YES ;;
-                *) OTHERFS=YES; NONZFS=YES ;;
+                ufs) UFS=YES ;;
+                *) OTHERFS=YES ;;
             esac
         done
         # si ZFS a la source
@@ -207,7 +210,7 @@ fi" > $srvinfos 2> $TRACES/$NAME.init_srv
                 return 1
             fi
             # si ZFS only: pas besoin de demon rsync
-            if [ -n "$ZFS" -a -z "$NONZFS" ]; then
+            if [ -n "$ZFS" -a -z "$UFS$OTHERFS" ]; then
                 FULLZFS=YES
                 if [ $(expr "$ZPOOLS" : ".* ") -eq 0 ]; then
                     ONEZPOOL=$ZPOOLS
@@ -265,7 +268,7 @@ log file = $RSYNC_SRV_DIR/rsyncd.log
 	read only = true
 EOF
   if rsync --daemon --config=$RSYNC_SRV_DIR/rsyncd.conf < /dev/null; then
-    echo export RSYNC_SRV_PID=$(cat $RSYNC_SRV_DIR/rsyncd.pid)
+    echo RSYNC_SRV_PID="$(cat $RSYNC_SRV_DIR/rsyncd.pid)"
   fi
 fi' 2> $TRACES/$NAME.get_rsync_daemon)
         if [ ! -z "$RSYNC_SRV_PID" ]; then
@@ -375,6 +378,7 @@ init_zfs_dest() {
         # on cree les elements intermediaires sans montage
         # (l'ordre *doit* etre du plus court au plus long)
         myzpath=$myzfsdest
+	ztocreate=""
         while ! zfs list -H -o name ${myzpath%/*}; do
             ztocreate=${myzpath%/*}" "$ztocreate
             myzpath=${myzpath%/*}
