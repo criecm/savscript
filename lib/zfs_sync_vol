@@ -146,7 +146,11 @@ do
       JUSTFORFUN="YES_JUSTFORFUN"
     ;;
     x)
-      EXCLUDEFILE=$OPTARG
+      if [ -f $OPTARG ]; then
+        EXCLUDEFILE=$OPTARG
+      else
+        echo "-x $OPTARG but $OPTARG doen't exist ... ignoring" >&2
+      fi
     ;;
     b)
       NEWSNAP=$OPTARG
