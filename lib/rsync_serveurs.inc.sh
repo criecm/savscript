@@ -11,10 +11,8 @@
 excludefrom=$TRACES/$NAME.excludes
 ZEXCLUDES="-x $excludefrom.zfs"
 #ZOPTS="-k $SSH_KEY -C -m 'GMT-%Y.%m.%d-%H.%M.%S' -I"
-ZOPTS="-k $SSH_KEY -CUBIu"
+ZOPTS="-k $SSH_KEY -CUIu"
 ZRECURSION="-R"
-# menage snapshots ZFS (voir zfs_sync_vol)
-export CLEANOLDSNAPSTOO=YO 
 
 if [ $DEBUG -ge 4 ]; then
     ZOPTS=$ZOPTS" -vv"
@@ -104,7 +102,7 @@ now_exclude() {
 
 # exclus un volume ZFS pour la suite
 now_exclude_zfs() {
-    grep -q ^$1 $excludefrom.zfs 2>/dev/null || echo $1 >> $excludefrom.zfs
+    grep -q '^'$1'$' $excludefrom.zfs 2>/dev/null || echo $1 >> $excludefrom.zfs
 }
 
 # warn_admin retcode "object" "tracefile" "message"
@@ -491,19 +489,22 @@ get_zfs() {
     shellex $ZFS_SYNC_VOL $ZRECURSION $ZEXCLUDES $ZOPTS ${s}@${DEST} ${d} >> $L 2>&1
     ret=$?
     if [ $ret -ne 0 ]; then
-        if fgrep -q 'No common snapshot' $L; then
+        if [ $ret -eq 7 ]; then
             syslogue "notice" "Deuxieme tentative avec -j pour get_zfs(${s})"
             shellex $ZFS_SYNC_VOL $ZRECURSION $ZEXCLUDES $ZOPTS -j ${s}@${DEST} ${d} >> $L 2>&1
             ret=$?
         fi
-        warn_admin $ret "get_zfs($*)" $L "Pb a la synchro du volume $1"
+        if [ $ret -eq 0 ]; then
+            warn_admin $ret "get_zfs($*)" $L "WARNING: probleme auto-corrige avec zfs_sync_vol -j (snapshot manquant)"
+        else
+            warn_admin $ret "get_zfs($*)" $L "WARNING: Pb a la synchro du volume $1"
+        fi
     fi
     # mettre le flag "readonly"
-    zfs get -H -r -o name,value -t filesystem -r readonly ${d} | grep 'off$' | cut -f 1 | xargs -L1 zfs set readonly=on
-    zfs get -Hp -oname,value,source -tfilesystem -r mountpoint ${d} | grep 'received$' | while read vol val src; do
-      zfs set mountpoint=$val $vol
-      zfs inherit orig:mountpoint $vol
-    done
+    #zfs get -H -o name,value -t filesystem -r readonly ${d} | grep 'off$' | cut -f 1 | xargs -L1 zfs set readonly=on
+    # TEMP: reverse ca: readonly s'herite
+    zfs get -H -o name,source -t filesystem -r readonly ${d} | grep -v '^'${d}'	' | cut -f 1 | xargs -L1 zfs inherit readonly
+    zfs get -H -o name,value -t filesystem readonly ${d} | grep -q 'off$' && zfs set readonly=on ${d}
     now_exclude_zfs $s
     say_end_with $ret
 }
@@ -544,10 +545,10 @@ is_jailed() {
 # get_jail jaildir
 get_jail() {
     jaildir=$1
-    is_jailed $jaildir || continue
-    is_excluded $jaildir && continue
+    is_jailed $jaildir || return 1
+    is_excluded $jaildir && return 1
     # si c'est un sous-repertoire, c'est pas ici ...
-    [ "$jaildir" = "$curjaildir" ] || continue
+    [ "$jaildir" = "$curjaildir" ] || return 1
     L=$TRACES/$NAME.jail.$curjail
     say_begin " JAIL $curjail ("
 
@@ -559,10 +560,11 @@ get_jail() {
         now_exclude_zfs $jaildir
     elif is_fstype ufs $jaildir; then
         get_ufs $jaildir $JAILSDESTDIR/$curjail $JAILSZFSDEST/$curjail
+        now_exclude $jaildir
     else
         get_fs $jaildir $JAILSDESTDIR/$curjail
+        now_exclude $jaildir
     fi
-    now_exclude $jaildir
 
     init_zfs_dest ${jaildir}-config $JAILSDESTDIR/${curjail}-config $JAILSZFSDEST/${curjail}-config
     confdest="${jdest}-config"
