@@ -210,8 +210,21 @@ fi" > $srvinfos 2> $TRACES/$NAME.init_srv
             # si ZFS only: pas besoin de demon rsync
             if [ -n "$ZFS" -a -z "$UFS$OTHERFS" ]; then
                 FULLZFS=YES
+                # si un seul zpool, c'est encore plus clair
                 if [ $(expr "$ZPOOLS" : ".* ") -eq 0 ]; then
                     ONEZPOOL=$ZPOOLS
+                else
+                # ... ou si un seul non-exclu
+                    for pool in $ZPOOLS; do
+                        if ! is_excluded $pool; then
+                            npools=$(( $npools+1 ))
+                            pools=$pool
+                        fi
+                    done
+                    if [ $npools -eq 1 ]; then
+                        # on oublie simplement les autres pools s'ils sont exclus
+                        ONEZPOOL=$pools
+                    fi
                 fi
             fi
         fi
@@ -490,7 +503,7 @@ get_zfs() {
     ret=$?
     if [ $ret -ne 0 ]; then
         if [ $ret -eq 7 ]; then
-            syslogue "notice" "Deuxieme tentative avec -j pour get_zfs(${s})"
+            syslogue "warning" "get_zfs(${s}@${DEST}): Deuxieme tentative avec -j pour get_zfs(${s})"
             shellex $ZFS_SYNC_VOL $ZRECURSION $ZEXCLUDES $ZOPTS -j ${s}@${DEST} ${d} >> $L 2>&1
             ret=$?
         fi
