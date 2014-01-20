@@ -59,7 +59,7 @@ if init_srv $DEST; then
             myret=$(( $myret + $? ))
         else
             for fs in $ZFSFSES; do
-                if ! is_excluded ${fs%|*} -a [ "${fs%|*}" != "none" ]; then
+                if ! is_excluded ${fs%|*} && ! is_excluded ${fs#*|} && [ "${fs%|*}" != "none" ]; then
                     get_zfs ${fs%|*} 
                     myret=$(( $myret + $? ))
                 fi
