@@ -596,13 +596,13 @@ TPOSTCHECKS=$(($TPOSTCHECKSOK - $TTRANSFEROK))
 if [ -z "$KEEPSRCSNAPS" -a $RET -eq 0 ]; then
   SRCSNAPSTODEL=$SRCSNAPSTODEL$(src_zfs_list | cut -d'!' -f1 | \
     grep -E '@'${SRCSNAPHOST:-$MYNAME}'-'${DSTSEARCHHOST:-$MYNAME}'-[[:digit:]]{8}-[[:digit:]]{2}h[[:digit:]]{2}m[[:digit:]]{2}s$' | \
-    grep -Fv $LASTCOMMONSNAP | fgrep -v $NEWSNAP | \
+    grep -Fv ${LASTCOMMONSNAP:-"THISCANNOTBEASNAPSHOTNAME"} | fgrep -v ${NEWSNAP} | \
     while read s; do if ! is_excluded ${s%@*} && [ "${s#*@}" != "$LASTCOMMONSNAP" ] && [ "${s#*@}" != "$NEWSNAP" ]; then echo " $s"; fi; done)
 fi
 if [ -z "$KEEPDSTSNAPS" -a $RET -eq 0 ]; then
   DSTSNAPSTODEL=$DSTSNAPSTODEL$(dst_zfs_list | cut -d'!' -f1 | \
     grep -E '@'${SRCSNAPHOST:-$MYNAME}'-'${DSTSEARCHHOST:-$MYNAME}'-[[:digit:]]{8}-[[:digit:]]{2}h[[:digit:]]{2}m[[:digit:]]{2}s$' | \
-    fgrep -v $LASTCOMMONSNAP | fgrep -v $NEWSNAP | \
+    fgrep -v ${LASTCOMMONSNAP:-"THISCANNOTBEASNAPSHOTNAME"} | fgrep -v ${NEWSNAP} | \
     while read s; do if ! is_excluded ${s%@*} && [ "${s#*@}" != "$LASTCOMMONSNAP" ] && [ "${s#*@}" != "$NEWSNAP" ]; then echo " $s"; fi; done)
 fi
 if [ ! -z "$SRCSNAPSTODEL" ]; then
