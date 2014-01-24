@@ -3,7 +3,7 @@
 # nouveau serveur a sauvegarder
 #
 if [ $# -lt 1 ]; then
-  echo "usage: $0 serveur [serveur …]"
+  echo "usage: $0 serveur [serveur [...]]"
   exit
 fi
 
