@@ -58,6 +58,10 @@ if init_srv $DEST; then
             get_zfs / $ZFSDEST $ONEZPOOL
             myret=$(( $myret + $? ))
         else
+            # si la racine est en ZFS, le pool ZFS vient a la racine
+            if [ -n "$ZFSSLASH" ]; then
+                get_zfs / $ZFSDEST ${ZFSSLASH%%/*}
+            fi
             for fs in $ZFSFSES; do
                 if ! is_excluded ${fs%|*} && ! is_excluded ${fs#*|} && [ "${fs%|*}" != "none" ]; then
                     get_zfs ${fs%|*} 
@@ -73,9 +77,9 @@ if init_srv $DEST; then
             [ $myret -eq 0 ] || MOUNTPROBLEM="YES"
             warn_admin $myret "FULLZFS:correction_montages" "$TRACES/$NAME.corrections_montages.sh" "Certains points de montages dangereux ${MOUNTPROBLEM:-non} corriges ${MOUNTPROBLEM:-\!}"
         fi
-        # remontage dans l'ordre si / a un mountpoint 'legacy' (monte par fstab)
+        # remontage dans l'ordre si / a un mountpoint 'legacy' (monte par fstab) ou autre
         if [ ! -z "$ZFSSLASH" -a -z "$MOUNTPROBLEM" ]; then
-            syslogue "info" "($NAME) FULLZFS: remontage dans l'ordre (racine en ZFS 'legacy')"
+            syslogue "info" "($NAME) FULLZFS: remontage dans l'ordre (racine en ZFS)"
             zfs list -H -o canmount,mountpoint,name,mounted -S name -r $ZFSDEST | awk '($1 ~ /^on$/ && $2 !~ /^legacy$/ && $4 ~ /^yes$/) { print $3 }' | xargs -L1 zfs umount
             mount | grep '^'$ZFSDEST'.* on '$DESTDIR | awk '{print $1}' | sort -r | xargs -L1 umount -f || mount -tzfs | grep '^'$ZFSDEST'.* on '$DESTDIR
             mount -tzfs $ZFSDEST/${ZFSSLASH#*/} $DESTDIR

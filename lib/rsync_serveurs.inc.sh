@@ -103,6 +103,7 @@ now_exclude() {
 # exclus un volume ZFS pour la suite
 now_exclude_zfs() {
     grep -q '^'$1'$' $excludefrom.zfs 2>/dev/null || echo $1 >> $excludefrom.zfs
+    EXCLUDES=$EXCLUDES" "$1
 }
 
 # warn_admin retcode "object" "tracefile" "message"
@@ -170,7 +171,7 @@ if [ \"\$(uname -s)\" = \"FreeBSD\" -a \${SYSVER%%.*} -gt 6 ]; then
   fi
   if [ \$(mount -t zfs | wc -l) -gt 0 ]; then
     echo ZPOOLS=\\\"\$(/sbin/zpool list -H -o name)\\\";
-    echo ZFSSLASH=\\\"\$(zfs list -H -omountpoint,name / | grep 'legacy' | awk '{print \$2}')\\\";
+    echo ZFSSLASH=\\\"\$(zfs list -H -omountpoint,name / | awk '{print \$2}')\\\";
     echo ZFSFSES=\\\"\$(zfs list -H -t filesystem -o mountpoint,name | sed \$SEDOPT 's/[[:space:]]+/|/')\\\";
   fi
 fi" > $srvinfos 2> $TRACES/$NAME.init_srv
@@ -502,9 +503,17 @@ get_zfs() {
     shellex $ZFS_SYNC_VOL $ZRECURSION $ZEXCLUDES $ZOPTS ${s}@${DEST} ${d} >> $L 2>&1
     ret=$?
     if [ $ret -ne 0 ]; then
+        MYZOPTS=$ZOPTS
         if [ $ret -eq 7 ]; then
+            MYZOPTS=$ZOPTS" -j"
             syslogue "warning" "get_zfs(${s}@${DEST}): Deuxieme tentative avec -j pour get_zfs(${s})"
-            shellex $ZFS_SYNC_VOL $ZRECURSION $ZEXCLUDES $ZOPTS -j ${s}@${DEST} ${d} >> $L 2>&1
+            shellex $ZFS_SYNC_VOL $ZRECURSION $ZEXCLUDES $MYZOPTS ${s}@${DEST} ${d} >> $L 2>&1
+            ret=$?
+        fi
+        if [ $ret -ne 0 -a $ret -ne 7 ] && grep -q "destination ${d}.* has been modified" $L; then
+            MYZOPTS=$MYZOPTS" -B"
+            syslogue "warning" "get_zfs(${s}@${DEST}): Deuxieme tentative avec -B pour get_zfs(${s})"
+            shellex $ZFS_SYNC_VOL $ZRECURSION $ZEXCLUDES $MYZOPTS ${s}@${DEST} ${d} >> $L 2>&1
             ret=$?
         fi
         if [ $ret -eq 0 ]; then
@@ -516,7 +525,7 @@ get_zfs() {
     # mettre le flag "readonly"
     #zfs get -H -o name,value -t filesystem -r readonly ${d} | grep 'off$' | cut -f 1 | xargs -L1 zfs set readonly=on
     # TEMP: reverse ca: readonly s'herite
-    zfs get -H -o name,source -t filesystem -r readonly ${d} | grep -v '^'${d}'	' | cut -f 1 | xargs -L1 zfs inherit readonly
+    #zfs get -H -o name,source -t filesystem -r readonly ${d} | grep -v '^'${d}'	' | cut -f 1 | xargs -L1 zfs inherit readonly
     zfs get -H -o name,value -t filesystem readonly ${d} | grep -q 'off$' && zfs set readonly=on ${d}
     now_exclude_zfs $s
     say_end_with $ret
