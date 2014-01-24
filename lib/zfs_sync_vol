@@ -94,15 +94,13 @@ do
     R)
       SENDOPT="-R"
       RECURSE="YES_RECURSE"
-      ROLLBACKOPT="-Rf"
-      #ROLLBACKOPT="-r"
-      DOROLLBACK="LOOSELY"
-      RECVOPT='-F'
+#      DOROLLBACK="LOOSELY"
+      RECVOPT=''
     ;;
     B)
       RECVOPT='-F'
-      DOROLLBACK='YES_ROLLBACK'
-      ROLLBACKOPT='-Rf'
+      #DOROLLBACK='YES_ROLLBACK'
+      #ROLLBACKOPT='-Rf'
     ;;
     u)
       NODSTMOUNT="YES_NODSTMOUNTS"
@@ -312,15 +310,16 @@ get_last_common_snapshot() {
   fi
   for snap in ${DSTVOL}@$lastknownsnap $SNAPCANDIDATES; do
     if src_zfs_list | cut -d'!' -f1 | grep -Eq '^'${SRCVOL}'@'${snap#*@}'$'; then
-      # check on all existing subvolumes on dst
       snapcandidate=${snap#*@}
+      # search for snapcandidate on all existing subvolumes on dst (but excluded or nor part of SRCVOL)
       for dstfs in $(dst_zfs_list | cut -d'!' -f1 | grep '^'${DSTVOL}'/[^@]*$'); do
         if ! dst_zfs_list | cut -d'!' -f1 | grep -q '^'$dstfs'@'${snapcandidate}'$'; then
           if is_excluded ${SRCVOL}${dstfs#$DSTVOL}; then
             warne "excluded fs existing on dest: $dstfs : delete ?"
 #            dst_cmd "zfs destroy -r $dstfs"
             rm $DSTZFSLIST
-          else
+          elif src_zfs_list | cut -d'!' -f1 | sed 's|'${SRCVOL}'|'${DSTVOL}'|' | grep -q '^'$dstfs; then
+            # this volume is part of $SRCVOL :(
             warne "snapshot ${snapcandidate} missing on $dstfs"
             snapcandidate=""
             break
@@ -328,7 +327,7 @@ get_last_common_snapshot() {
         fi
       done
       [ -z "$snapcandidate" ] && continue
-      # check all subvolumes *but new or excluded* on src
+      # search for snapcandidate all subvolumes *but new or excluded* on src
       for fs in $(src_zfs_list | cut -d'!' -f1 | grep -E '^'${SRCVOL}'[^@]*$'); do
         # if the snapshot doesn't exists on a sub-volume on source...
         if ! src_zfs_list | cut -d'!' -f1 | grep -q '^'$fs'@'${snapcandidate}'$' && ! is_excluded $fs; then
@@ -460,7 +459,7 @@ if ! src_zfs_list | cut -d'!' -f1 | grep -q '^'${SRCVOL}'$'; then
   if src_zfs_list | cut -d'!' -f2 | grep -q '^'${SRCVOL}'$'; then
     SRCVOL=$(src_zfs_list | fgrep -q '!'${SRCVOL}'!' | cut -d'!' -f1)
   else
-    missingvol ${SRC}
+    erreur "Le volume ${SRC} n'existe pas"
   fi
 fi
 
@@ -469,17 +468,18 @@ DSTMOUNTBASE=$(dst_zfs_list | grep '^'${DSTVOL}'!' | cut -d'!' -f2)
 # create destination if needed && -C
 if [ -z "$DSTMOUNTBASE" ]; then
   if [ "$CREATEDEST" = "YES_CREATEDEST" ]; then
-    cmd="zfs create"
-    $srcrocmd "zfs get -H -oproperty,value,source all ${SRCVOL} | grep 'local$'" | while read prop val source; do
-        if [ "$prop" = "mountpoint" -a "$val" != "none" -a "$val" != "legacy" ]; then
-          cmd="$cmd -o orig:mountpoint=$val"
-        else
-          cmd="$cmd -o $prop=$val";
-        fi
-      done
-    dst_run "$cmd ${DSTVOL}" || missingvol ${DST:+$DST}
-    rm $DSTZFSLIST
-    DSTMOUNTBASE=$(dst_zfs_list | grep '^'${DSTVOL}'!' | cut -d'!' -f2)
+    RECVOPT='-F'
+    #cmd="zfs create"
+    #$srcrocmd "zfs get -H -oproperty,value,source all ${SRCVOL} | grep 'local$'" | while read prop val source; do
+    #    if [ "$prop" = "mountpoint" -a "$val" != "none" -a "$val" != "legacy" ]; then
+    #      cmd="$cmd -o orig:mountpoint=$val"
+    #    else
+    #      cmd="$cmd -o $prop=$val";
+    #    fi
+    #  done
+    #dst_run "$cmd ${DSTVOL}" || missingvol ${DST:+$DST}
+    #rm $DSTZFSLIST
+    DSTMOUNTBASE=$($dstrocmd "zfs list -H -omountpoint ${DSTVOL%/*}")/${DSTVOL##*/}
   else
     erreur "La destination (${DSTVOL}) n'existe pas et pas -C :("
   fi
@@ -539,27 +539,25 @@ DONE=0
 DSTSNAPSTODEL=""
 
 SRC_SEND_CMD="zfs send ${SENDOPT} ${LASTCOMMONSNAP:+$INCOPT $LASTCOMMONSNAP} ${SRCVOL}@${NEWSNAP}"
-DST_REVC_CMD="zfs receive -v ${RECVOPT}${NODSTMOUNT:+ -u} ${DSTVOL}"
+DST_RECV_CMD="zfs receive -v ${RECVOPT}${NODSTMOUNT:+ -u} ${DSTVOL}"
 inform "Sending ${SRCVOL}@${NEWSNAP}${MBUFFER_SRC_CMD:+ with mbuffer}${TRANSPORT_CMD:+ via TRANSPORT_CMD}"
 if [ ! -z "$TRANSPORT_CMD" ]; then
   src_run "$SRC_SEND_CMD | $TRANSPORT_SRC_CMD $TRANSPORT_SRC_OPTS" &
   sleep 1
-  dst_run "$TRANSPORT_DST_CMD $TRANSPORT_DST_OPTS | $DST_REVC_CMD"
+  dst_run "$TRANSPORT_DST_CMD $TRANSPORT_DST_OPTS | $DST_RECV_CMD"
   wait
   RET=$?
 else
-  src_run "$SRC_SEND_CMD ${MBUFFER_SRC_CMD:+ | $MBUFFER_SRC_CMD}" | dst_run "${MBUFFER_DST_CMD:+$MBUFFER_DST_CMD | }$DST_REVC_CMD"
+  src_run "$SRC_SEND_CMD ${MBUFFER_SRC_CMD:+ | $MBUFFER_SRC_CMD}" | dst_run "${MBUFFER_DST_CMD:+$MBUFFER_DST_CMD | }$DST_RECV_CMD"
   RET=$?
 fi
 if [ $RET -ne 0 ]; then
-  if [ -z "$DOROLLBACK" ]; then
-    warne "Error transfering from ${SRCHOST:+"$SRCHOST:"}${SRCVOL}@${NEWSNAP} to ${DSTHOST:+"$DSTHOST:"}${DSTVOL}${LASTCOMMONSNAP:+" (inc. based on @$LASTCOMMONSNAP)"}. zfs returns $RET"
-    warne "  send command $SRC_SEND_CMD"
-    warne "  receive command $SRC_SEND_CMD"
-    warne "you may retry with -B (rollback forced) and/or -j (loosy snapshot search)"
-    SRCSNAPSTODEL=$SRCSNAPSTODEL${NEWSNAP:+" ${SRCVOL}@${NEWSNAP}"}
-    DSTSNAPSTODEL=$DSTSNAPSTODEL${NEWSNAP:+" ${DSTVOL}@${NEWSNAP}"}
-  fi
+  warne "Error transfering from ${SRCHOST:+"$SRCHOST:"}${SRCVOL}@${NEWSNAP} to ${DSTHOST:+"$DSTHOST:"}${DSTVOL}${LASTCOMMONSNAP:+" (inc. based on @$LASTCOMMONSNAP)"}. zfs returns $RET"
+  warne "  send command $SRC_SEND_CMD"
+  warne "  receive command $DST_RECV_CMD"
+  warne "you may retry with -B (rollback forced) and/or -j (loosy snapshot search)"
+  SRCSNAPSTODEL=$SRCSNAPSTODEL${NEWSNAP:+" ${SRCVOL}@${NEWSNAP}"}
+  DSTSNAPSTODEL=$DSTSNAPSTODEL${NEWSNAP:+" ${DSTVOL}@${NEWSNAP}"}
 else
   inform "Transfer ok :)"
   [ -z "$KEEPSRCSNAPS" ] && SRCSNAPSTODEL=$SRCSNAPSTODEL${LASTCOMMONSNAP:+" ${SRCVOL}@${LASTCOMMONSNAP}"}
@@ -571,9 +569,9 @@ TTRANSFER=$(($TTRANSFEROK - $TMKSNAPOK))
 # correction des points de montage
 if [ -z "$DSTREMOUNTORIG" -a ! -z "$CORRECTMOUNTS" ]; then
   inform "Enregistrement+modification des points de montage originaux sur ${DSTVOL}"
-  dst_run 'zfs get -Hp -r -t filesystem -oname,value,source mountpoint '${DSTVOL}' | grep 'received$' | while read vol val src; do
+  dst_run 'zfs get -Hp -r -t filesystem -oname,value,source mountpoint '${DSTVOL}' | sort -r | grep 'received$' | while read vol val src; do
     if [ "$val" != "legacy" ] && [ "$val" != "none" ]; then
-      zfs inherit mountpoint $vol
+      zfs set mountpoint=${DSTMOUNTBASE}$val $vol
       zfs set orig:mountpoint=$val $vol
     fi
   done'
@@ -582,7 +580,7 @@ fi
 # si restauration, on remet les points de montage originaux
 if [ ! -z "$DSTREMOUNTORIG" ]; then
   inform "Restauration des points de montage originaux sur ${DSTVOL}"
-  dst_run 'zfs get -Hp -t filesystem -r -oname,vallue,source orig:mountpoint '${DSTVOL}' | while read vol val src; do
+  dst_run 'zfs get -Hp -t filesystem -r -oname,vallue,source orig:mountpoint '${DSTVOL}' | sort -r | while read vol val src; do
     if [ "$src" = "local" -a "$val" != "-" ]; then
       zfs set mountpoint=$val $vol
       zfs inherit orig:mountpoint $vol
