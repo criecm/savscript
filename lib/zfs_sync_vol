@@ -601,7 +601,7 @@ if [ -z "$KEEPDSTSNAPS" -a $RET -eq 0 ]; then
   DSTSNAPSTODEL=$DSTSNAPSTODEL$(dst_zfs_list | cut -d'!' -f1 | \
     grep -E '@'${SRCSNAPHOST:-$MYNAME}'-'${DSTSEARCHHOST:-$MYNAME}'-[[:digit:]]{8}-[[:digit:]]{2}h[[:digit:]]{2}m[[:digit:]]{2}s$' | \
     fgrep -v ${LASTCOMMONSNAP:-"THISCANNOTBEASNAPSHOTNAME"} | fgrep -v ${NEWSNAP} | \
-    while read s; do if ! is_excluded ${s%@*} && [ "${s#*@}" != "$LASTCOMMONSNAP" ] && [ "${s#*@}" != "$NEWSNAP" ]; then echo " $s"; fi; done)
+    while read s; do if ! is_excluded ${s%@*} && [ "${s#*@}" != "$LASTCOMMONSNAP" ] && [ "${s#*@}" != "$NEWSNAP" ] && src_zfs_list | ( v=${s%@*}; grep -q '^'${SRCVOL}${v#$DSTVOL}'!'); then echo " $s"; fi; done)
 fi
 if [ ! -z "$SRCSNAPSTODEL" ]; then
   inform "Cleaning snapshots${SRCHOST:+ on $SRCHOST}: $SRCSNAPSTODEL" 
