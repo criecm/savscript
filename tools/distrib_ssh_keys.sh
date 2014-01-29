@@ -5,7 +5,8 @@
 # si $OLD_KEY est definie, la supprime des authorized_keys
 # si $FORCE est defini, re-ecrit les authorized_keys
 #
-. rsync_serveurs.conf || exit 1
+savpath=$(realpath "$(dirname $0)/..")
+. $savpath/rsync_serveurs.conf || exit 1
 
 prepend=",no-agent-forwarding,no-port-forwarding,no-X11-forwarding,no-pty"
 
@@ -17,7 +18,7 @@ if [ $# -eq 0 ]; then
 fi
 
 if [ "$1" = "all" ]; then
-  machines=$(for i in machines.d/*.conf; do eval $(grep ^DEST= $i); echo $DEST; done)
+  machines=$(for i in $savpath/machines.d/*.conf; do eval $(grep ^DEST= $i); echo $DEST; done)
   shift
 else
   machines=$@
@@ -25,7 +26,7 @@ else
 fi
 
 for m in $machines; do
-  eval $(grep ^DEST machines.d/$m.conf)
+  eval $(grep ^DEST $savpath/machines.d/$m.conf)
   [ -z "$DEST" ] && DEST=$m
   if ! ssh -oPasswordAuthentication=no -oStrictHostKeyChecking=yes -oIdentitiesOnly=yes -oIdentityFile=$SSH_KEY -oKbdInteractiveDevices=none root@$DEST "echo connexion ssh ok" || [ -n "$FORCE" ]; then
     ssh-keygen -R $DEST

@@ -7,7 +7,8 @@ if [ $# -lt 1 ]; then
   exit
 fi
 
-. rsync_serveurs.conf || exit 1
+savpath=$(realpath "$(dirname $0)/..")
+. $savpath/rsync_serveurs.conf || exit 1
 
 prepend=",no-agent-forwarding,no-port-forwarding,no-X11-forwarding,no-user-rc,no-pty"
 
@@ -60,19 +61,19 @@ if [ -z "$MYNAME" -o -z "$MYIP" -o -z "$MYFQDN" -o -z "$RSYNC" -o -z "$SYSTEM" ]
   exit 1
 fi
 
-sed -E 's/%%NAME%%/'$MYNAME'/; s/%%FQDN%%/'$MYFQDN'/; s@%%EXCLUDES%%@'"$EXCLUDES"'@;' machines.d/conf.template > /tmp/$MYNAME.conf
+sed -E 's/%%NAME%%/'$MYNAME'/; s/%%FQDN%%/'$MYFQDN'/; s@%%EXCLUDES%%@'"$EXCLUDES"'@;' $savpath/machines.d/conf.template > /tmp/$MYNAME.conf
 
 echo La conf generee:
 echo -- "##############################################################################"
 cat /tmp/$MYNAME.conf
 echo -- "##############################################################################"
 
-if [ -f machines.d/$MYNAME.conf ]; then
-  echo "machines.d/$MYNAME.conf existe (la supprimer avant pour la remplacer)"
+if [ -f $savpath/machines.d/$MYNAME.conf ]; then
+  echo "$savpath/machines.d/$MYNAME.conf existe (la supprimer avant pour la remplacer)"
   exit 1
 fi
 
 echo "On l'installe ? (ENTREE ou CTRL+C)"
 read p
-mv /tmp/$MYNAME.conf machines.d/$MYNAME.conf
+mv /tmp/$MYNAME.conf $savpath/machines.d/$MYNAME.conf
 
