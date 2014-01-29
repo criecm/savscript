@@ -4,7 +4,7 @@
 #
 # ce script est concu pour etre appele via une cle ssh
 #
-. /usr/local/admin/utils/common/common.sh.inc
+#. /usr/local/admin/utils/common/common.sh.inc
 
 host=""
 dest=""
@@ -73,12 +73,12 @@ if dialog --yesno "La restauration doit-elle se faire en FULL-ZFS (si non, rsync
   done
   SNAP=$(dialog --backtitle "Choix du snapshot" --title "Choisis le bon :)" --nocancel --menu 0 0 0 0 $SNAPS 2>&1 1>&3)
   test -n "$SNAP" || exit 1
-  if askok "On envoie $srczfsvol@$SNAP sur le pool zroot de $host (en ecrasant tout !) ?"; then
+  if dialog --yesno "On envoie $srczfsvol@$SNAP sur le pool zroot de $host (en ecrasant tout !) ?" 0 0; then
     /usr/local/admin/utils/freebsd/zfs_sync_vol -k /root/.ssh/id_rsyncsav -CRu -r $SNAP ${srczfsvol} zroot@${dest} || exit 1
   fi
 else
   echo "${host}: restauration rsync:"
-  if askok "On rsync $srcdir/ sur $dest/mnt/ (en ecrasant tout !) ?"; then
+  if dialog --yesno "On rsync $srcdir/ sur $dest/mnt/ (en ecrasant tout !) ?" 0 0; then
     echo "rsync -a --exclude .zfs/ --exclude .snap/ -e 'ssh -i /root/.ssh/id_rsyncsav' ${srcdir}/ root@${dest}:/mnt/"
     rsync -a --exclude .zfs/ --exclude .snap/ -e 'ssh -i /root/.ssh/id_rsyncsav' ${srcdir}/ root@${dest}:/mnt/
   fi

@@ -3,7 +3,7 @@
 # include pour chaque script serveur
 #
 # utilise les variables "$NAME","$DEST","$excludes"
-. /usr/local/admin/utils/common/common.sh.inc
+#. /usr/local/admin/utils/common/common.sh.inc
 . $mydir/lib/log.inc.sh
 
 #ZFS_SYNC_VOL=${ZFS_SYNC_VOL:-$(which zfs_sync_vol)}
@@ -177,7 +177,7 @@ if [ \"\$(uname -s)\" = \"FreeBSD\" -a \${SYSVER%%.*} -gt 6 ]; then
 fi" > $srvinfos 2> $TRACES/$NAME.init_srv
         . $srvinfos >> $TRACES/$NAME.init_srv 2>&1
     else
-        aiiie "Serveur $DEST down. Pas de sauvegarde"
+        syslogue "crit" "Serveur $DEST down. Pas de sauvegarde"
         return 1
     fi
     
