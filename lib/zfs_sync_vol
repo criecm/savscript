@@ -450,7 +450,7 @@ else
   # try mbuffer
   MBUFFER_SRC_CMD=$($srcrocmd "which mbuffer | fgrep -v 'not found'")
   [ ! -z "$MBUFFER_SRC_CMD" ] && MBUFFER_SRC_CMD=$MBUFFER_SRC_CMD" -m 64M -q"
-  MBUFFER_DST_CMD=$($srcrocmd "which mbuffer | fgrep -v 'not found'")
+  MBUFFER_DST_CMD=$($dstrocmd "which mbuffer | fgrep -v 'not found'")
   [ ! -z "$MBUFFER_DST_CMD" ] && MBUFFER_DST_CMD=$MBUFFER_DST_CMD" -m 1G -q"
 fi
 
