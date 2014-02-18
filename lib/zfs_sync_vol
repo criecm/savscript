@@ -257,7 +257,7 @@ src_zfs_list() {
   if [ ! -f "$SRCZFSLIST" ]; then
     $srcrocmd "zfs list -H -t all -oname,mountpoint,lastbackup:${DSTSNAPHOST:-$MYNAME} -S creation -r $SRCVOL | sed 's/	/!/g'" > $SRCZFSLIST
     # WARNING: there is a TAB in next line !
-    $srcrocmd "zfs get -r -Hp -t filesystem -oname,value,source mountpoint ${DSTSNAPHOST} $SRCVOL | sed 's/	/!/g'" > $SRCZFSLIST.mounts
+    $srcrocmd "zfs get -r -Hp -t filesystem -oname,value,source mountpoint $SRCVOL | sed 's/	/\!/g'" > $SRCZFSLIST.mounts
   fi
   cat $SRCZFSLIST
 }
@@ -265,7 +265,7 @@ src_zfs_list() {
 dst_zfs_list() {
   if [ ! -f "$DSTZFSLIST" ]; then
     # WARNING: there is a TAB in next line !
-    $dstrocmd "zfs list -H -t all -oname,mountpoint,orig:mountpoint -S creation -r $DSTVOL | sed 's/	/!/g'" > $DSTZFSLIST
+    $dstrocmd "zfs list -H -t all -oname,mountpoint,orig:mountpoint -S creation -r $DSTVOL | sed 's/	/\!/g'" > $DSTZFSLIST
   fi
   cat $DSTZFSLIST
 }
@@ -399,7 +399,7 @@ SYSLOG_ID=${SYSLOG_ID:-user}
 ####################
 ### process args ###
 ####################
-SSHOPTS="-T"${SSHKEY:+" -i $SSHKEY"}${TEMPSSH:+" -o \"UserKnownHostsFile ${TMPDIR:-/tmp}/kkk\" -o \"CheckHostIP no\""}${SSH_CIPHERS:+" -c $SSH_CIPHERS"}
+SSHOPTS="-T"${SSHKEY:+" -i $SSHKEY"}${TEMPSSH:+" -oUserKnownHostsFile=${TMPDIR:-/tmp}/kkk -oCheckHostIP=no"}${SSH_CIPHERS:+" -c $SSH_CIPHERS"}
 
 # determine source and dest hosts, volumes,...
 SRCHOST=""
@@ -580,8 +580,8 @@ fi
 # si restauration, on remet les points de montage originaux
 if [ ! -z "$DSTREMOUNTORIG" ]; then
   inform "Restauration des points de montage originaux sur ${DSTVOL}"
-  dst_run 'zfs get -Hp -t filesystem -r -oname,vallue,source orig:mountpoint '${DSTVOL}' | sort -r | while read vol val src; do
-    if [ "$src" = "local" -a "$val" != "-" ]; then
+  dst_run 'zfs get -Hp -t filesystem -r -oname,value,source orig:mountpoint '${DSTVOL}' | sort -r | while read vol val src; do
+    if [ "$src" = "received" -a "$val" != "-" ]; then
       zfs set mountpoint=$val $vol
       zfs inherit orig:mountpoint $vol
     fi
