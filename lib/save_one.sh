@@ -129,6 +129,6 @@ if init_srv $DEST; then
     cleanup_srv
     exit $allret
 else
-    plainte "Pas de sauvegarde pour $NAME cette fois :-("
+    syslogue "error" "Pas de sauvegarde pour $NAME cette fois :-("
     exit 2
 fi
