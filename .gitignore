@@ -1,1 +1,2 @@
 rsync_serveurs.conf
+machines.d/*.conf
