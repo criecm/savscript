@@ -12,12 +12,12 @@ savpath=$(realpath "$(dirname $0)/..")
 
 prepend=",no-agent-forwarding,no-port-forwarding,no-X11-forwarding,no-user-rc,no-pty"
 
-if ! ssh -oPasswordAuthentication=no -oIdentitiesOnly=yes -oIdentityFile=/root/.ssh/id_rsyncsav -oKbdInteractiveDevices=none root@$1 "echo connexion ssh ok"; then
+if ! ssh -oPasswordAuthentication=no -oIdentitiesOnly=yes -oIdentityFile=$SSH_KEY -oKbdInteractiveDevices=none root@$1 "echo connexion ssh ok"; then
   echo "pousse la cle sur ${1}:"
   echo "from=\""$(ssh $1 "echo \$SSH_CONNECTION"| awk '{print $1}')"\"$prepend $(cat $SSH_KEY.pub)" > /tmp/k
   cat /tmp/k | ssh root@$1 "cat >> .ssh/authorized_keys"
 fi
-eval $(ssh -oPasswordAuthentication=no -oIdentitiesOnly=yes -oIdentityFile=/root/.ssh/id_rsyncsav -oKbdInteractiveDevices=none root@$1 'SYSTEM=`uname -s`; 
+eval $(ssh -oPasswordAuthentication=no -oIdentitiesOnly=yes -oIdentityFile=$SSH_KEY -oKbdInteractiveDevices=none root@$1 'SYSTEM=`uname -s`; 
 case "$SYSTEM" in
 "Linux")
     case `lsb_release -si` in
