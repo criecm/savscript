@@ -358,7 +358,7 @@ rollback_to_last_common_snapshot() {
 }
 
 # sanity check args
-if [ ! -z "$SRCPRESNAPFORMAT" ] && [ "$SNAPOPT" != "-I" ]; then
+if [ ! -z "$SRCPRESNAPFORMAT" ] && [ "$INCOPT" != "-I" ]; then
   warne "$0: -m needs -I to get the snapshot"
   exec $0 -0
 fi
