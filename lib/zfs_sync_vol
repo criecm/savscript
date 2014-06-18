@@ -479,7 +479,9 @@ if [ -z "$DSTMOUNTBASE" ]; then
     #  done
     #dst_run "$cmd ${DSTVOL}" || missingvol ${DST:+$DST}
     #rm $DSTZFSLIST
-    DSTMOUNTBASE=$($dstrocmd "zfs list -H -omountpoint ${DSTVOL%/*}")/${DSTVOL##*/}
+    PARENTDEST=$($dstrocmd "zfs list -H -omountpoint ${DSTVOL%/*}" | grep -Ev '(none|legacy)')
+    [ -z "$PARENTDEST" ] && erreur "Impossible de determiner le repertoire de montage"
+    DSTMOUNTBASE=${PARENTDEST}/${DSTVOL##*/}
   else
     erreur "La destination (${DSTVOL}) n'existe pas et pas -C :("
   fi
@@ -495,9 +497,9 @@ for fs in $(grep '!local$' $SRCZFSLIST.mounts | cut -d'!' -f1 | sed 's|'${SRCVOL
 done
 
 # check for dangerous mountpoints on dest
-if ! dst_zfs_list | grep -Ev '^'${DSTVOL}'.*!(none|legacy)!' | grep -qv '!'${DSTMOUNTBASE}'!'; then
+if dst_zfs_list | grep -Ev '^'${DSTVOL}'.*!(none|legacy|-)!' | grep -qv '!'${DSTMOUNTBASE}'!'; then
   if [ -z "$CORRECTMOUNTS" -a -z "$DSTREMOUNTORIG" ]; then
-    erreur "WARNING: certains points de montage sont hors de $DSTMOUNTBASE (et -U absent) : $(dst_zfs_list | grep -Ev '^'${DSTVOL}'.*    (none|legacy)   ' | grep -v '!'${DSTMOUNTBASE} | sed 's/^\(.*\)!\(.*\)!.*$/\1 -> \2/')"
+    erreur "WARNING: certains points de montage sont hors de $DSTMOUNTBASE (et -U absent) : $(dst_zfs_list | grep -Ev '^'${DSTVOL}'.*!(none|legacy)!' | grep -v '!'${DSTMOUNTBASE} | sed 's/^\(.*\)!\(.*\)!.*$/\1 -> \2/')"
   fi
 fi
 
