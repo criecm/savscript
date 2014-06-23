@@ -43,6 +43,7 @@ usage() {
   echo "      -U: safe mountpoints (backed up to orig:mountpoint if outside of destination"
   echo "      -z: replace safe mountpoints (using orig:mountpoint if exists)"
   echo "      -C: create missing destination volume (or let 'zfs receive -F' create it)"
+  echo "      -c /mountpoint: specify mountpoint for created volume"
   echo "      -I: use 'zfs send -I' instead of 'send -i' (sends all intermediary snapshots - zfs(1M))"
   echo "          WARNING: if source has 'daily.0' names (REnamed snapshots)"
   echo "          you HAVE to use -R (AND understand what it does)"
@@ -85,7 +86,7 @@ shortusage() {
 }
 
 ORIGARGS=$@
-while getopts IRk:t:sSo:O:H:hCnuUzTb:ax:Bm:l:jv option
+while getopts IRk:t:sSo:O:H:hCc:nuUzTb:ax:Bm:l:jv option
 do
   case $option in
     I)
@@ -95,7 +96,6 @@ do
       SENDOPT="-R"
       RECURSE="YES_RECURSE"
 #      DOROLLBACK="LOOSELY"
-      RECVOPT=''
     ;;
     B)
       RECVOPT='-F'
@@ -110,6 +110,9 @@ do
     ;;
     C)
       CREATEDEST="YES_CREATEDEST"
+    ;;
+    c)
+      CREATEMOUNTPOINT=$OPTARG
     ;;
     k)
       SSHKEY=$OPTARG
@@ -255,17 +258,17 @@ src_run() {
 
 src_zfs_list() {
   if [ ! -f "$SRCZFSLIST" ]; then
-    $srcrocmd "zfs list -H -t all -oname,mountpoint,lastbackup:${DSTSNAPHOST:-$MYNAME} -S creation -r $SRCVOL | sed 's/	/!/g'" > $SRCZFSLIST
-    # WARNING: there is a TAB in next line !
-    $srcrocmd "zfs get -r -Hp -t filesystem -oname,value,source mountpoint $SRCVOL | sed 's/	/\!/g'" > $SRCZFSLIST.mounts
+    # WARNING: there are TABs in next line !
+    $srcrocmd "zfs list -H -t all -oname,mountpoint,lastbackup:${DSTSNAPHOST:-$MYNAME} -S creation ${LIMIT_RECURSION:+-d1} -r $SRCVOL | sed 's/	/!/g'" > $SRCZFSLIST
+    $srcrocmd "zfs get ${RECURSE:+-r} -Hp -t filesystem -oname,value,source mountpoint $SRCVOL | sed 's/	/\!/g'" > $SRCZFSLIST.mounts
   fi
   cat $SRCZFSLIST
 }
 
 dst_zfs_list() {
   if [ ! -f "$DSTZFSLIST" ]; then
-    # WARNING: there is a TAB in next line !
-    $dstrocmd "zfs list -H -t all -oname,mountpoint,orig:mountpoint -S creation -r $DSTVOL | sed 's/	/\!/g'" > $DSTZFSLIST
+    # WARNING: there are TABs in next line !
+    $dstrocmd "zfs list -H -t filesystem,volume -oname,mountpoint,orig:mountpoint -S creation ${RECURSE:+-r} $DSTVOL | sed 's/	/\!/g'; zfs list -H -t snapshot -oname,mountpoint,orig:mountpoint -S creation ${LIMIT_RECURSION:+-d1} -r $DSTVOL | sed 's/	/\!/g'" > $DSTZFSLIST
   fi
   cat $DSTZFSLIST
 }
@@ -374,6 +377,9 @@ if [ ! -z "$EXCLUDEFILE" ]; then
     erreur "-x <file> only makes sense with -R"
   fi
 fi
+if [ "$RECURSE" != "YES_RECURSE" ]; then
+  LIMIT_RECURSION="YES_LIMIT"
+fi
 
 #TRANSPORTCMD=${TRANSPORTCMD:-""}
 
@@ -479,9 +485,15 @@ if [ -z "$DSTMOUNTBASE" ]; then
     #  done
     #dst_run "$cmd ${DSTVOL}" || missingvol ${DST:+$DST}
     #rm $DSTZFSLIST
-    PARENTDEST=$($dstrocmd "zfs list -H -omountpoint ${DSTVOL%/*}" | grep -Ev '(none|legacy)')
-    [ -z "$PARENTDEST" ] && erreur "Impossible de determiner le repertoire de montage"
-    DSTMOUNTBASE=${PARENTDEST}/${DSTVOL##*/}
+    if [ -n "$CREATEMOUNTPOINT" ]; then
+      DSTMOUNTBASE=$CREATEMOUNTPOINT
+      $dstcmd "zfs create -o mountpoint=$CREATEMOUNTPOINT ${DSTVOL}" || erreur "Impossible de creer $DSTVOL (mountpoint=$CREATEMOUNTPOINT)"
+      rm $DSTZFSLIST
+    else
+      PARENTDEST=$($dstrocmd "zfs list -H -omountpoint ${DSTVOL%/*}" | grep -Ev '(none|legacy)')
+      [ -z "$PARENTDEST" ] && erreur "Impossible de determiner le repertoire de montage"
+      DSTMOUNTBASE=${PARENTDEST}/${DSTVOL##*/}
+    fi
   else
     erreur "La destination (${DSTVOL}) n'existe pas et pas -C :("
   fi
@@ -497,9 +509,9 @@ for fs in $(grep '!local$' $SRCZFSLIST.mounts | cut -d'!' -f1 | sed 's|'${SRCVOL
 done
 
 # check for dangerous mountpoints on dest
-if dst_zfs_list | grep -Ev '^'${DSTVOL}'.*!(none|legacy|-)!' | grep -qv '!'${DSTMOUNTBASE}'!'; then
+if [ -n "$(dst_zfs_list | grep -Ev '^'${DSTVOL}'.*!(none|legacy|-)!' | grep -qv '!'${DSTMOUNTBASE}'!')" ]; then
   if [ -z "$CORRECTMOUNTS" -a -z "$DSTREMOUNTORIG" ]; then
-    erreur "WARNING: certains points de montage sont hors de $DSTMOUNTBASE (et -U absent) : $(dst_zfs_list | grep -Ev '^'${DSTVOL}'.*!(none|legacy)!' | grep -v '!'${DSTMOUNTBASE} | sed 's/^\(.*\)!\(.*\)!.*$/\1 -> \2/')"
+    erreur "WARNING: certains points de montage sont hors de $DSTMOUNTBASE (et -U absent) : $(dst_zfs_list | grep -Ev '^'${DSTVOL}'.*!(none|legacy|-)!' | grep -v '!'${DSTMOUNTBASE} | sed 's/^\(.*\)!\(.*\)!.*$/\1 -> \2/')"
   fi
 fi
 
@@ -525,7 +537,7 @@ fi
 # create source snapshot if ! -b
 if [ -z "$NEWSNAP" ]; then
   # create snapshot on source (this one is quick)
-  NEWSNAP=${SRCSNAPHOST:-$MYNAME}'-'${DSTSHOST:-$MYNAME}'-'$(date +%Y%m%d-%Hh%Mm%Ss)
+  NEWSNAP=${SRCSNAPHOST:-$MYNAME}'-'${DSTHOST:-$MYNAME}'-'$(date +%Y%m%d-%Hh%Mm%Ss)
   # workaround: si on demande un incremental trop vite, on triche d'une minute
   if [ "$NEWSNAP" = "$LASTCOMMONSNAP" ]; then
     NEWSNAP=${SRCSNAPHOST:-$MYNAME}'-'${DSTSNAPHOST:-$MYNAME}'-'$(date -v +1S +%Y%m%d-%Hh%Mm%Ss)
