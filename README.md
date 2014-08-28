@@ -3,6 +3,7 @@
 - creez une paire de cles ssh pour la sauvegarde
 
   `ssh-keygen ~/.ssh/id_rsa_savscript`
+
 - copiez rsync_serveurs.conf.dist en rsync_serveurs.conf
 - editez rsync_serveurs.conf
 - utilisez `./tools/nouvelle_machine.sh` pour ajouter une machine dans machines.d/ automatiquement
