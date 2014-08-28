@@ -6,7 +6,7 @@
 # si $FORCE est defini, re-ecrit les authorized_keys
 #
 savpath=$(realpath "$(dirname $0)/..")
-. $savpath/rsync_serveurs.conf || exit 1
+. $savpath/savscript.conf || exit 1
 
 prepend=",no-agent-forwarding,no-port-forwarding,no-X11-forwarding,no-pty"
 

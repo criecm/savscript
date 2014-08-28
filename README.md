@@ -1,15 +1,19 @@
 #### Script de sauvegarde ZFS/*nix ####
 
-- creez une paire de cles ssh pour la sauvegarde
+- creez une paire de cles ssh pour la sauvegarde: (la cle publique sera installee sur chaque client dans `~root/.ssh/authorized_keys`)
 
-  `ssh-keygen ~/.ssh/id_rsa_savscript`
+  `ssh-keygen -C "savscript@$(hostname -s)" -N '' -f ~/.ssh/id_rsa_sav`
 
-- copiez rsync_serveurs.conf.dist en rsync_serveurs.conf
-- editez rsync_serveurs.conf
+- copiez savscript.conf.dist en savscript.conf
+- editez savscript.conf
 - utilisez `./tools/nouvelle_machine.sh` pour ajouter une machine dans machines.d/ automatiquement
-- lancez `./rsync_serveurs.sh` (avec -v en cas de problème)
+- lancez `./savscript.sh` (avec -v en cas de problème)
 - ajoutez au crontab une ligne du type:
 
-  `32 23 * * *	root	/chemin/vers/rsync_serveurs.sh`
+  `32 23 * * *	root	/chemin/vers/savscript.sh`
  
+### C'est quoi ce truc ? ###
 
+- pas de client "lourd"
+- pur /bin/sh, ssh, rsync (du connu :) et ZFS !
+- prevu/testé pour un serveur FreeBSD

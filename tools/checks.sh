@@ -2,7 +2,7 @@
 #
 # verifications diverses des sauvegardes
 #
-. rsync_serveurs.conf
+. savscript.conf
 
 # supprime une propriete (et la sauvegarde en orig:)
 resetprop() {

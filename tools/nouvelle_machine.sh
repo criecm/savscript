@@ -8,7 +8,7 @@ if [ $# -lt 1 ]; then
 fi
 
 savpath=$(realpath "$(dirname $0)/..")
-. $savpath/rsync_serveurs.conf || exit 1
+. $savpath/savscript.conf || exit 1
 
 prepend=",no-agent-forwarding,no-port-forwarding,no-X11-forwarding,no-user-rc,no-pty"
 

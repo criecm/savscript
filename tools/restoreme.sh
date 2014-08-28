@@ -28,7 +28,7 @@ erreur() {
 }
 
 savpath=$(realpath "$(dirname $0)/..")
-. $savpath/rsync_serveurs.conf || exit 1
+. $savpath/savscript.conf || exit 1
 
 if [ -z "$host" ]; then
   echo "usage: $0 host [dest]"
@@ -49,7 +49,7 @@ if [ ! -d "$srcdir" ] || ! zfs list -H -oname $srczfsvol; then
   erreur "$srcdir ou $srczfsvol inexistant"
 fi
 
-. $savpath/lib/rsync_serveurs.inc.sh
+. $savpath/lib/savscript.inc.sh
 
 fping -t 1 $dest || erreur "$dest ne pong pas :("
 

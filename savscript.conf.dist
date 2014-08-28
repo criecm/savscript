@@ -1,13 +1,13 @@
-# configuration de rsync_serveurs
+# configuration de savscript
 
 # PATH: on doit y trouver rsync, zfs (PATH root + utils)
 PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
 
 # script zfs_sync_vol
-ZFS_SYNC_VOL=/usr/local/admin/utils/savscript/lib/zfs_sync_vol
+ZFS_SYNC_VOL=$mydir/lib/zfs_sync_vol
 
 # script zfs_snap_make
-ZFS_SNAP_MAKE=/usr/local/admin/utils/freebsd/zfs_snap_make
+ZFS_SNAP_MAKE=$mydir/lib/zfs_snap_make
 
 # max n. of concurrent jobs
 MAXJOBS=4
@@ -25,7 +25,7 @@ SAVDESTBASE="/sav"
 SAVZFSBASE=$(zfs list -H -o name $SAVDESTBASE)
 
 # mail a prevenir en cas de probleme
-ADMINMAIL="dgeo@ec-m.fr"
+ADMINMAIL="admin@chez.moi"
 
 # binaire rsync
 RSYNC="/usr/local/bin/rsync"

@@ -4,7 +4,7 @@
 #
 if [ -z "$CONFIG_LOADED" ]; then
   echo "ne pas utiliser directement"
-  echo " utiliser $mydir/rsync_serveurs.sh machine"
+  echo " utiliser $mydir/savscript.sh machine"
   exit 1
 elif [ $# -ne 1 -o ! -f "$1" ]; then
   syslogue "error" "Argument \"$1\" non valide"
@@ -19,7 +19,7 @@ JAILSDESTDIR=${JAILSDESTDIR:-"$SAVDESTBASE/jails"}
 RSYNC_PORT=${RSYNC_PORT:-42873}
 RSYNC_DIRECT=${RSYNC_DIRECT:-"YES"}
 
-. $mydir/lib/rsync_serveurs.inc.sh
+. $mydir/lib/savscript.inc.sh
 
 DEST=${DEST:-$NAME}
 

@@ -1,2 +1,2 @@
-rsync_serveurs.conf
+savscript.conf
 machines.d/*.conf

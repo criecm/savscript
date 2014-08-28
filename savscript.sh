@@ -2,7 +2,7 @@
 #
 # Script de sauvegardes des serveurs *n*x ECM.
 #
-# Principe: un script/serveur dans un repertoire rsync_serveurs/
+# Principe: une conf/client dans un repertoire machines.d/
 #
 # TODOS: 
 #  - MAJ script restauration (ZFS slash/root, verifier autres systemes, pb cle ssh, orig:mountpoint)
@@ -14,10 +14,10 @@ PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin
 mydir=$(dirname $0)
 
 if [ -z "$CONFIG_LOADED" ]; then
-  . $mydir/rsync_serveurs.conf
+  . $mydir/savscript.conf
   for i in RSYNC_OPTS SSH_KEY SAVDESTBASE ADMINMAIL MACHINESDIR FSTYPES; do
     if ! eval "test -n \"\$$i\""; then
-      echo "manque $i dans la rsync_serveurs.conf" >&2
+      echo "manque $i dans la savscript.conf" >&2
       exit 1
     fi
   done
@@ -103,7 +103,7 @@ waitupto() {
 
 . $mydir/lib/log.inc.sh
 
-# s'il y a des arguments, on execute les fichiers correspondants (rsync_serveurs/$arg.rsync)
+# s'il y a des arguments, on lance un save_one.sh pour chacun
 if [ $# -gt 0 ]; then
   while [ $# -gt 0 ]; do
     # NEW
@@ -137,18 +137,18 @@ if [ $# -gt 0 ]; then
 else
   # sinon, lister les fichiers *.conf dans machines.d/
   # et se lancer pour chacun
-  syslogue "info" "rsync_serveurs: GO $(date)"
+  syslogue "info" "savscript: GO $(date)"
   TBEGINALL=$(date +%s)
   for file in $mydir/machines.d/*.conf; do
     waitupto
     serv=$(grep ^NAME $file|cut -d= -f2)
-    syslogue "info" "rsync_serveurs: debut ${serv} "$(date)
-    date >> /var/log/rsync_serveurs.$serv.log
-    /bin/sh $mydir/lib/save_one.sh $file >> /var/log/rsync_serveurs.$serv.log 2>&1 &
+    syslogue "info" "savscript: debut ${serv} "$(date)
+    date >> /var/log/savscript.$serv.log
+    /bin/sh $mydir/lib/save_one.sh $file >> /var/log/savscript.$serv.log 2>&1 &
   done
   waitupto 0
   TOTALS=$(($(date +%s) - $TBEGINALL))
-  syslogue "info" "rsync_serveurs: THE END ($(($TOTALS / 3600))h$(($TOTALS % 3600 / 60))m$(($TOTALS % 3600 % 60))s)"
+  syslogue "info" "savscript: THE END ($(($TOTALS / 3600))h$(($TOTALS % 3600 / 60))m$(($TOTALS % 3600 % 60))s)"
 fi
 if [ -s $TRACES/msg ]; then
   if [ ! -z "$ADMINMAIL" ]; then
