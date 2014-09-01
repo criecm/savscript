@@ -478,7 +478,7 @@ get_ufs() {
     fi
     shellex $ZFS_SNAP_MAKE -q ${UFSTS:+-s $UFSTS} $myzfsdest
     if [ $ret -ne 0 ]; then
-        syslog "error" "Probleme a la sauvegarde de ${DEST}:${dir} (UFS+snapshot)"
+        syslogue "error" "Probleme a la sauvegarde de ${DEST}:${dir} (UFS+snapshot)"
         warn_admin $ret "get_ufs($*)" $L "Pb avec $RSYNC_COMMAND$RSYNC_DSTBASE$UFSMOUNTDIR"
     fi
     say_end_with $ret
