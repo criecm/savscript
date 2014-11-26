@@ -70,12 +70,13 @@ if init_srv $DEST; then
             done
         fi
         # modification des points de montage si besoin (protection du systeme local !)
-        zfs list -H -o mountpoint,name -r $ZFSDEST | awk '($1 !~ /^'$(echo $SAVDESTBASE|sed 's@/@\\/@g')'/ && $1 !~ /(legacy|none)/) { gsub("^/$","",$1); printf("zfs set mountpoint='$DESTDIR'%s %s; zfs set orig:mountpoint=%s;\n",$1,$2,$1); }' > $TRACES/$NAME.corrections_montages.sh 2>> $TRACES/$NAME.corrections_montages.log
+        zfs list -H -o mountpoint,name -r $ZFSDEST | awk '($1 !~ /^'$(echo $SAVDESTBASE|sed 's@/@\\/@g')'/ && $1 !~ /(legacy|none)/) { gsub("^/$","",$1); printf("zfs set mountpoint='$DESTDIR'%s %s; zfs set orig:mountpoint=/%s %s;\n",$1,$2,$1,$2); }' > $TRACES/$NAME.corrections_montages.sh 2>> $TRACES/$NAME.corrections_montages.log
         if [ -s $TRACES/$NAME.corrections_montages.sh ]; then
             shellex $TRACES/$NAME.corrections_montages.sh >> $TRACES/$NAME.corrections_montages.log 2>&1 
             myret=$?
+            myret=$(($myret + $(wc -l $TRACES/$NAME.corrections_montages.log)))
             [ $myret -eq 0 ] || MOUNTPROBLEM="YES"
-            warn_admin $myret "FULLZFS:correction_montages" "$TRACES/$NAME.corrections_montages.sh" "Certains points de montages dangereux ${MOUNTPROBLEM:-non} corriges ${MOUNTPROBLEM:-\!}"
+            warn_admin $myret "FULLZFS:correction_montages" "$TRACES/$NAME.corrections_montages.sh" "Certains points de montages dangereux ${MOUNTPROBLEM:+non }corriges ${MOUNTPROBLEM:+\!}"
         fi
         # remontage dans l'ordre si / a un mountpoint 'legacy' (monte par fstab) ou autre
         if [ ! -z "$ZFSSLASH" -a -z "$MOUNTPROBLEM" ]; then

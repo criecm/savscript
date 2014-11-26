@@ -500,7 +500,7 @@ if [ -z "$DSTMOUNTBASE" ]; then
 fi
 
 # check for dangerous new fixed mountpoints on source for new volumes
-for fs in $(grep '!local$' $SRCZFSLIST.mounts | cut -d'!' -f1 | sed 's|'${SRCVOL}'|'${DSTVOL}'|'); do
+for fs in $(grep '!\(local\|received\)$' $SRCZFSLIST.mounts | cut -d'!' -f1 | sed 's|'${SRCVOL}'|'${DSTVOL}'|'); do
   dst_zfs_list | grep '^'$fs'!' | cut -d'!' -f2 | while read dstmountpoint; do
     if ! expr "$dstmountpoint" : "$DSTMOUNTBASE" > /dev/null && [ -z "$CORRECTMOUNTS" -a -z "$DSTREMOUNTORIG" ]; then
       erreur "DANGEROUS: some mountpoints out of $DSTMOUNTBASE (and no -U !)"
