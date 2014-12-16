@@ -470,6 +470,7 @@ if ! src_zfs_list | cut -d'!' -f1 | grep -q '^'${SRCVOL}'$'; then
 fi
 
 DSTMOUNTBASE=$(dst_zfs_list | grep '^'${DSTVOL}'!' | cut -d'!' -f2)
+SRCMOUNTBASE=$(src_zfs_list | grep '^'${SRCVOL}'!' | cut -d'!' -f2)
 
 # create destination if needed && -C
 if [ -z "$DSTMOUNTBASE" ]; then
@@ -585,7 +586,7 @@ if [ -z "$DSTREMOUNTORIG" -a ! -z "$CORRECTMOUNTS" ]; then
   inform "Enregistrement+modification des points de montage originaux sur ${DSTVOL}"
   dst_run 'zfs get -Hp -r -t filesystem -oname,value,source mountpoint '${DSTVOL}' | sort -r | grep 'received$' | while read vol val src; do
     if [ "$val" != "legacy" ] && [ "$val" != "none" ]; then
-      zfs set mountpoint=${DSTMOUNTBASE}$val $vol
+      zfs set mountpoint=${DSTMOUNTBASE}${val#$SRCMOUNTBASE} $vol
       zfs set orig:mountpoint=$val $vol
     fi
   done'
