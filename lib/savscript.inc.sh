@@ -49,10 +49,10 @@ fi
 if [ ! -z "$SYSLOG_FACILITY" ]; then
     ZOPTS=$ZOPTS" -l $SYSLOG_FACILITY"
 fi
-# use: rsync_it srcdir/ dstdir/
+# use: rsync_it srcdir/ dstdir/ logfile
 rsync_it() {
     [ $DEBUG -ge 2 ] && RSYNC_OPTS=$RSYNC_OPTS" -v"
-    doit $RSYNC_COMMAND $RSYNC_OPTS $(rsync_excludes_for ${1}) ${RSYNC_SRV_BASE}${1} ${2}
+    doit $RSYNC_COMMAND $RSYNC_OPTS $(rsync_excludes_for ${1}) ${RSYNC_SRV_BASE}${1} ${2} >> ${3} 2>&1
     res=$?
     case $res in
         0|23|24)
@@ -430,7 +430,7 @@ get_fs() {
     say_begin "$dir"
     init_zfs_dest $dir $2 $3
     L=$TRACES/$NAME.get_fs.$(echo $1 | sed 's@/@_@g')
-    rsync_it ${dir%/}/ $mydestdir/ >> $L 2>&1
+    rsync_it ${dir%/}/ $mydestdir/ $L
     ret=$?
     shellex $ZFS_SNAP_MAKE -q $myzfsdest
     if [ $ret -ne 0 ]; then
@@ -466,14 +466,14 @@ get_ufs() {
     fi
     init_zfs_dest $dir $2 $3
     if [ ! -z "$UFSTS" ]; then
-        rsync_it ${UFSMOUNTDIR}/ $mydestdir/ >> $L 2>&1
+        rsync_it ${UFSMOUNTDIR}/ $mydestdir/ $L
         ret=$?
         # menage du snapshot source
         $REMOTE_COMMAND $DEST "umount $UFSMOUNTDIR || ( fuser -k -m $UFSMOUNTDIR ; umount -f $UFSMOUNTDIR ); \
             mdconfig -l -v | fgrep ${dir%/}/.snap/$UFSSNAPNAME | cut -f1 | xargs -L1 mdconfig -d -u && rm -f ${dir%/}/.snap/$UFSSNAPNAME && rmdir $UFSMOUNTDIR;" || syslogue "error" "AIIIE: snapshot impossible a supprimer: ${dir%/}/$UFSSNAPNAME monte sur $UFSMOUNTDIR" >> $L 2>&1
     else
         [ ${SYSVER%%.*} -gt 5 ] && syslogue "notice" "get_ufs($dir): pas reussi a utiliser un snapshot :-/"
-        rsync_it ${dir%/}/ $mydestdir/ >> $L 2>&1
+        rsync_it ${dir%/}/ $mydestdir/ $L
         ret=$?
     fi
     shellex $ZFS_SNAP_MAKE -q ${UFSTS:+-s $UFSTS} $myzfsdest
@@ -517,7 +517,7 @@ get_zfs() {
             ret=$?
         fi
         if [ $ret -eq 0 ]; then
-            warn_admin $ret "get_zfs($*)" $L "WARNING: probleme auto-corrige avec zfs_sync_vol -j (snapshot manquant)"
+            warn_admin $ret "get_zfs($*)" $L "WARNING: probleme auto-corrige (snapshot manquant)"
         else
             warn_admin $ret "get_zfs($*)" $L "WARNING: Pb a la synchro du volume $1"
         fi
