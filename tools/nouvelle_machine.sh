@@ -28,7 +28,7 @@ case "$SYSTEM" in
     FSLIST="`for fst in ext3 ext4 ext2 btrfs; do df -t $fst; done | tail -n +2 | awk '\''{print $6}'\''`"
 ;;
 "FreeBSD")
-    EXCLUDES="/usr/ports/distfiles /usr/obj"
+    EXCLUDES=""
     FSTYPES="ufs,zfs,ext3,ext2"
     JAILS=`jls | tail -n +2`
     FSLIST="`df -t'$FSTYPES' | tail -n +2 | awk '\''{print $6}'\''`"
