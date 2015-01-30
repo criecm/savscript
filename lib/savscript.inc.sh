@@ -451,18 +451,18 @@ get_ufs() {
         UFSTS=$($REMOTE_COMMAND $DEST "\
             if [ -d \"${dir}\" ] && [ -d ${dir%/}/.snap ]; then \
               if mount -u -o snapshot ${dir%/}/.snap/$UFSSNAPNAME ${dir}; then \
-                TS=\$(TZ=UTC date +%s)
+                TS=\$(TZ=UTC date +%s); \
                 mkdir -p $UFSMOUNTDIR; \
                 if mount -r /dev/\$(mdconfig -a -t vnode -o readonly -f ${dir%/}/.snap/$UFSSNAPNAME) $UFSMOUNTDIR; then \
                   echo \$TS; \
                 else \
                   mdconfig -l -v | grep $UFSSNAPNAME | cut -f1 | xargs -L1 mdconfig -d -u ; \
                   rm -f ${dir%/}/.snap/$UFSSNAPNAME 2>/dev/null; \
-                fi \
+                fi; \
               else \
                 test -f ${dir%/}/.snap/$UFSSNAPNAME && rm -f ${dir%/}/.snap/$UFSSNAPNAME; \
-              fi \
-            fi") >> $L 2>&1 || return 1
+              fi; \
+            fi;") >> $L 2>&1 || return 1
     fi
     init_zfs_dest $dir $2 $3
     if [ ! -z "$UFSTS" ]; then
