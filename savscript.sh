@@ -77,7 +77,7 @@ if [ -e "$TRACES" ]; then
 fi
 mkdir $TRACES
 
-if [ $DEBUG -gt 3 ]; then
+if [ $DEBUG -ge 3 ]; then
   DEBUGADONF=1
   if [ $DEBUG -ge 2 ]; then
     MAXJOBS=1
@@ -95,7 +95,7 @@ fi
 ## fonction de parallelisation
 waitupto() {
   MYMAX=${1:-$MAXJOBS}
-  while [ $(( $(pgrep -f '/bin/sh '$mydir'/lib/save_one.sh' | wc -l) )) -gt $(( MYMAX )) ]; do
+  while [ $(( $(pgrep -f '/bin/sh '${DEBUGADONF:+-x }$mydir'/lib/save_one.sh' | wc -l) )) -gt $(( MYMAX )) ]; do
     sleep 3
 #  echo -n "."
   done
