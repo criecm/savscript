@@ -144,7 +144,7 @@ else
     serv=$(grep ^NAME $file|cut -d= -f2)
     syslogue "info" "savscript: debut ${serv} "$(date)
     date >> /var/log/savscript.$serv.log
-    /bin/sh $mydir/lib/save_one.sh $file >> /var/log/savscript.$serv.log 2>&1 &
+    /bin/sh $mydir/lib/save_one.sh $file >> /var/log/savscript.$serv.log || echo "Probleme avec $serv" >> $TRACES/msg 2>&1 &
   done
   waitupto 0
   TOTALS=$(($(date +%s) - $TBEGINALL))

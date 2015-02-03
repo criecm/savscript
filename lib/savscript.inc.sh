@@ -280,8 +280,8 @@ log file = $RSYNC_SRV_DIR/rsyncd.log
 	read only = true
 EOF
   if rsync --daemon --config=$RSYNC_SRV_DIR/rsyncd.conf < /dev/null; then
-    echo RSYNC_SRV_PID="$(cat $RSYNC_SRV_DIR/rsyncd.pid)"
-  fi
+    echo "RSYNC_SRV_PID=$(cat $RSYNC_SRV_DIR/rsyncd.pid)";
+  fi;
 fi' 2> $TRACES/$NAME.get_rsync_daemon)
         if [ ! -z "$RSYNC_SRV_PID" ]; then
             RSYNC_SRV_BASE="${DEST}::root"
@@ -462,7 +462,7 @@ get_ufs() {
               else \
                 test -f ${dir%/}/.snap/$UFSSNAPNAME && rm -f ${dir%/}/.snap/$UFSSNAPNAME; \
               fi; \
-            fi;") >> $L 2>&1 || return 1
+            fi" 2>>$L ) >> $L
     fi
     init_zfs_dest $dir $2 $3
     if [ ! -z "$UFSTS" ]; then
