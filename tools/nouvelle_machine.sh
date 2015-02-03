@@ -73,6 +73,8 @@ if [ -f $savpath/machines.d/$MYNAME.conf ]; then
   exit 1
 fi
 
+ssh -i $SSH_KEY -x -a root@$FQDN "echo ok" || echo "La conf /tmp/$MYNAME.conf n'est pas fonctionnelle"
+
 echo "On l'installe ? (ENTREE ou CTRL+C)"
 read p
 mv /tmp/$MYNAME.conf $savpath/machines.d/$MYNAME.conf
