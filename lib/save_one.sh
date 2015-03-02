@@ -74,7 +74,7 @@ if init_srv $DEST; then
         if [ -s $TRACES/$NAME.corrections_montages.sh ]; then
             shellex $TRACES/$NAME.corrections_montages.sh >> $TRACES/$NAME.corrections_montages.log 2>&1 
             myret=$?
-            myret=$(($myret + $(wc -l $TRACES/$NAME.corrections_montages.log)))
+            myret=$(($myret + $(wc -l $TRACES/$NAME.corrections_montages.log | cut -f1)))
             [ $myret -eq 0 ] || MOUNTPROBLEM="YES"
             warn_admin $myret "FULLZFS:correction_montages" "$TRACES/$NAME.corrections_montages.sh" "Certains points de montages dangereux ${MOUNTPROBLEM:+non }corriges ${MOUNTPROBLEM:+\!}"
         fi
