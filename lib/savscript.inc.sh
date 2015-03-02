@@ -256,33 +256,34 @@ fi" > $srvinfos 2> $TRACES/$NAME.init_srv
 
 get_rsync_daemon() {
     if [ "$RSYNC_DIRECT" = "YES" ]; then
-        eval $($REMOTE_COMMAND $DEST 'RSYNC_SRV_DIR=/tmp/SAV.rsyncd
-MYADDR=$(echo ${SSH_CONNECTION} | awk "{print \$3}")
-if [ -d $RSYNC_SRV_DIR ]; then
-  test -f $RSYNC_SRV_DIR/rsyncd.pid && kill $(cat $RSYNC_SRV_DIR/rsyncd.pid)
-  rm -rf $RSYNC_SRV_DIR
-  pgrep -f "rsync.*/tmp/SAV" && pkill -9 -f "rsync.*/tmp/SAV"
-fi
-if mkdir $RSYNC_SRV_DIR; then
-  cat > $RSYNC_SRV_DIR/rsyncd.conf << EOF
+        eval $($REMOTE_COMMAND $DEST "RSYNC_SRV_DIR=/tmp/SAV.rsyncd;
+MYADDR=\$(echo \${SSH_CONNECTION} | awk '{print \$3}');
+if [ -d \$RSYNC_SRV_DIR ]; then
+  test -s \$RSYNC_SRV_DIR/rsyncd.pid && kill \$(cat \$RSYNC_SRV_DIR/rsyncd.pid) > /dev/null 2>&1;
+  rm -rf \$RSYNC_SRV_DIR;
+  pgrep -f 'rsync.*/tmp/SAV' && pkill -9 -f 'rsync.*/tmp/SAV';
+fi;
+if mkdir \$RSYNC_SRV_DIR; then
+  cat > \$RSYNC_SRV_DIR/rsyncd.conf << EOF
 uid = root
 gid = 0
 use chroot = no
 max connections = 4
 syslog facility = daemon
-address = $MYADDR
-port = '$RSYNC_PORT'
-pid file = $RSYNC_SRV_DIR/rsyncd.pid
-log file = $RSYNC_SRV_DIR/rsyncd.log
+address = \$MYADDR
+port = '\$RSYNC_PORT'
+pid file = \$RSYNC_SRV_DIR/rsyncd.pid
+log file = \$RSYNC_SRV_DIR/rsyncd.log
 [root]
 	path = /
-	hosts allow = ${SSH_CLIENT%% *}
+	hosts allow = \${SSH_CLIENT%% *}
 	read only = true
 EOF
-  if rsync --daemon --config=$RSYNC_SRV_DIR/rsyncd.conf < /dev/null; then
-    echo "RSYNC_SRV_PID=$(cat $RSYNC_SRV_DIR/rsyncd.pid)";
+  if rsync --daemon --config=\$RSYNC_SRV_DIR/rsyncd.conf < /dev/null; then
+    sleep 1;
+    echo RSYNC_SRV_PID=\$(cat $RSYNC_SRV_DIR/rsyncd.pid|grep -v ^$);
   fi;
-fi' 2> $TRACES/$NAME.get_rsync_daemon)
+fi" 2> $TRACES/$NAME.get_rsync_daemon) >> $TRACES/$NAME.get_rsync_daemon 2>&1
         if [ ! -z "$RSYNC_SRV_PID" ]; then
             RSYNC_SRV_BASE="${DEST}::root"
             return 0
