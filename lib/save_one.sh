@@ -35,7 +35,7 @@ if init_srv $DEST; then
     myret=0
 
     # JAILS
-    if [ ! -z "$SAV_JAILS" ]; then
+    if [ "$SAV_JAILS" = "YES" ]; then
         if [ ! -z "$JAILS" ]; then
             for jaildir in $JAILS; do
                 if ! is_excluded $jaildir; then

@@ -5,7 +5,7 @@ DEST=%%FQDN%%
 # chemins a exclure de la sauvegarde
 EXCLUDES="%%EXCLUDES%%"
 # sauvegarde les jails a part s'il y en a 
-# default: YES (si FreeBSD && jls)
+# default: NO
 #SAV_JAILS="NO"
 # lance un serveur rsync sur la destination au lieu de passer par ssh
 # default: YES (essaye, fallback to ssh)
