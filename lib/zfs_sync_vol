@@ -476,15 +476,15 @@ SRCMOUNTBASE=$(src_zfs_list | grep '^'${SRCVOL}'!' | cut -d'!' -f2)
 if [ -z "$DSTMOUNTBASE" ]; then
   if [ "$CREATEDEST" = "YES_CREATEDEST" ]; then
     RECVOPT='-F'
-    #cmd="zfs create"
-    #$srcrocmd "zfs get -H -oproperty,value,source all ${SRCVOL} | grep 'local$'" | while read prop val source; do
-    #    if [ "$prop" = "mountpoint" -a "$val" != "none" -a "$val" != "legacy" ]; then
-    #      cmd="$cmd -o orig:mountpoint=$val"
-    #    else
-    #      cmd="$cmd -o $prop=$val";
-    #    fi
-    #  done
-    #dst_run "$cmd ${DSTVOL}" || missingvol ${DST:+$DST}
+    cmd="zfs create"
+    $srcrocmd "zfs get -H -oproperty,value,source all ${SRCVOL} | grep 'local$'" | while read prop val source; do
+        if [ "$prop" = "mountpoint" -a "$val" != "none" -a "$val" != "legacy" ]; then
+          cmd="$cmd -o orig:mountpoint=$val"
+        else
+          cmd="$cmd -o $prop=$val";
+        fi
+      done
+    dst_run "$cmd ${DSTVOL}" || missingvol ${DST:+$DST}
     #rm $DSTZFSLIST
     if [ -n "$CREATEMOUNTPOINT" ]; then
       DSTMOUNTBASE=$CREATEMOUNTPOINT
