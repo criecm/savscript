@@ -167,7 +167,11 @@ echo \"FSLIST=\\\"\$(mount -t $FSTYPES | sed \$SEDOPT 's@^.*on (/[^ ]*) (\(|type
 if [ \"\$(uname -s)\" = \"FreeBSD\" -a \${SYSVER%%.*} -gt 6 ]; then
   echo JAILS=\\\"\$(/usr/sbin/jls | awk '(\$1 ~ /^[0-9]+\$/) { printf(\"%s\\\n\",\$4); }')\\\";
   if [ -x /usr/local/bin/ezjail-admin ]; then
-    echo INACTIVEJAILS=\\\"\$(cd /usr/local/etc/ezjail; ls | fgrep norun | xargs -L1 awk 'BEGIN { FS=\"\\\"\" } (\$1 ~ /rootdir/) { print \$2 }')\\\"
+    echo INACTIVEJAILS=\\\"\$(cd /usr/local/etc/ezjail; ls | fgrep norun | xargs -L1 awk 'BEGIN { FS=\"\\\"\" } (\$1 ~ /rootdir/) { print \$2 }')\\\";
+  fi
+  if [ -x /usr/local/sbin/iocage ]; then
+    echo INACTIVEJAILS=\\\"\$(/usr/local/sbin/iocage list | awk '(\$3 == \"down\") { printf(\"/iocage/jails/%s\\\n\",\$1);}')\\\";
+    echo IOJAILS=\\\"\$(/usr/local/sbin/iocage list | awk '(\$3 == \"up\") { printf(\"%s:%s\\\n\",\$4,\$1);}')\\\";
   fi
   if [ \$(mount -t zfs | wc -l) -gt 0 ]; then
     echo ZPOOLS=\\\"\$(/sbin/zpool list -H -o name)\\\";
@@ -564,6 +568,22 @@ is_jailed() {
     return 1
 }
 
+# renvoie le hostname d'un jail iocage
+is_iojail() {
+    [ -z "$IOJAILS" ] && return 1
+    UUID=${1%/root}
+    UUID=${UUID#/iocage/jails/}
+    if echo "$IOJAILS" | fgrep -q ":$UUID"; then
+      for ioj in $IOJAILS; do
+        if echo "${ioj#*:}" | fgrep -q "$UUID"; then
+          echo "${ioj%:*}"
+          return 0
+        fi
+      done
+    fi
+    return 1
+}
+
 # sauvegarde d'un jail
 # get_jail jaildir
 get_jail() {
@@ -573,12 +593,24 @@ get_jail() {
     # si c'est un sous-repertoire, c'est pas ici ...
     [ "$jaildir" = "$curjaildir" ] || return 1
     L=$TRACES/$NAME.jail.$curjail
-    say_begin " JAIL $curjail ("
 
-    zjdest=$JAILSZFSDEST/$curjail
-    jdest=$JAILSDESTDIR/$curjail
+    h=$(is_iojail $jaildir)
+    say_begin " JAIL ${h:-$curjail} ("
 
-    if is_fstype zfs $jaildir; then
+    zjdest=$JAILSZFSDEST/${h:-$curjail}
+    jdest=$JAILSDESTDIR/${h:-$curjail}
+
+    h=$(is_iojail $jaildir)
+    # for iocage, change dest to $JAILSZFSDEST/$hostname and source toor /root parent
+    if [ ! -z "$h" ]; then
+        IOZSRC=$(get_zfs_src_for $jaildir)
+        IOZSRC=${IOZSRC%/root}
+        get_zfs $jaildir $JAILSZFSDEST/$h $IOZSRC
+        ret=$?
+        now_exclude_zfs $IOZSRC
+        say_end_with $ret ")"
+        return $ret
+    elif is_fstype zfs $jaildir; then
         get_zfs $jaildir $JAILSZFSDEST/$curjail
         now_exclude_zfs $jaildir
     elif is_fstype ufs $jaildir; then
