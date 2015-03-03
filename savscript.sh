@@ -56,7 +56,7 @@ SAVZFSBASE=${SAVZFSBASE:-$(zfs list -H -o name "$SAVDESTBASE")}
 # mail a prevenir en cas de probleme
 ADMINMAIL=${ADMINMAIL:-"dgeo@ec-m.fr"}
 # repertoire de base pour le stockage temporaire des resultats
-TRACESDIRBASE=${TRACESDIRBASE:-"/tmp/LOG.SAUV_TRACES"}
+TRACESDIRBASE=${TRACESDIRBASE:-"$TMPDIR/LOG.SAUV_TRACES"}
 # max n. of concurrent jobs
 MAXJOBS=${MAXJOBS:-10}
 # syslog facility
@@ -72,6 +72,7 @@ if ! zfs list -H -o name "$SAVZFSBASE" > /dev/null; then
 fi
 
 TRACES=$TRACESDIRBASE.$$
+TMPDIR=$TRACES
 if [ -e "$TRACES" ]; then
   rm -rf $TRACES
 fi
@@ -84,7 +85,7 @@ if [ $DEBUG -ge 3 ]; then
   fi
 fi
 
-export PATH RSYNC RSYNC_OPTS SAVDESTBASE SAVZFSBASE mydir TRACES REMOTE_COMMAND SSH_KEY DEBUG MACHINESDIR FSTYPES ZFS_SYNC_VOL ZFS_SNAP_MAKE
+export PATH RSYNC RSYNC_OPTS SAVDESTBASE SAVZFSBASE mydir TRACES REMOTE_COMMAND SSH_KEY DEBUG MACHINESDIR FSTYPES ZFS_SYNC_VOL ZFS_SNAP_MAKE TMPDIR
 
 ## checks
 if ! mount | grep -q 'on '$SAVDESTBASE ; then

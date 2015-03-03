@@ -16,7 +16,7 @@ MAXJOBS=4
 MACHINESDIR=$mydir/machines.d
 
 # repertoire de base pour le stockage temporaire des resultats
-TRACESDIRBASE="/tmp/LOG.SAUV_TRACES"
+TRACESDIRBASE="${TMPDIR:-/tmp}/LOG.SAUV_TRACES"
 
 # repertoire des sauvegardes
 SAVDESTBASE="/sav"
