@@ -401,7 +401,7 @@ init_zfs_dest() {
             myzpath=${myzpath%/*}
         done
         for zc in $ztocreate; do
-            doit zfs create -o canmount=off -o orig:mountpoint=none -o orig:canmount=off $ztocreate
+            doit zfs create -o canmount=off -o orig:mountpoint=none -o orig:canmount=off $zc
         done
         zfs create -o orig:mountpoint=$mydir $myzfsdest
 
