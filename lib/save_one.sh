@@ -113,7 +113,7 @@ if init_srv $DEST; then
                     myret=$(( $myret + $? ))
                 ;;
                 esac
-            else
+#            else
 #               echo "$dir EXCLU"
             fi
 	    if [ $myret -ne 0 ]; then

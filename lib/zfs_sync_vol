@@ -336,9 +336,9 @@ get_last_common_snapshot() {
         if ! src_zfs_list | cut -d'!' -f1 | grep -q '^'$fs'@'${snapcandidate}'$' && ! is_excluded $fs; then
           # ..check that the volume doesn't exist on ${DSTVOL} (new vol on $SRC), 
           # otherwise this snap wouldn't work
-          if dst_zfs_list | cut -d'!' -f1 | grep -q '^'${DSTVOL}${fs#${SRCVOL}}'$'; then
-            snapcandidate=""
+          if dst_zfs_list | cut -d'!' -f1 | grep -q '^'${DSTVOL}${fs#${SRCVOL}}'!'; then
             debug "$snapcandidate non valide (manque sur ${DSTVOL}${fs#${SRCVOL}})"
+            snapcandidate=""
             break
           fi
         fi

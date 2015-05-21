@@ -318,6 +318,13 @@ cleanup_srv() {
         fi
         return $myres
     fi
+    # supprime les snapshots de transfert d'une autre source vers le serveur sauvegardé
+    if [ -z "$NEVER_CLEAN_ZFS_SPURIOUS_SNAPS" ]; then
+        for snap in $(zfs list -H -oname -r -t snapshot $ZFSDEST | grep '@.*-'$NAME'-2'); do
+            syslogue "info" "cleanup_srv(): destroying $snap"
+            zfs destroy -d $snap || warn_admin 1 "cleanup_srv(): unable to destroy $snap"
+        done
+    fi
     return 0
 }
 
