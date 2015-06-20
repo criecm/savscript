@@ -171,7 +171,7 @@ if [ \"\$(uname -s)\" = \"FreeBSD\" -a \${SYSVER%%.*} -gt 6 ]; then
   fi
   if [ -x /usr/local/sbin/iocage ]; then
     echo INACTIVEJAILS=\\\"\$(/usr/local/sbin/iocage list | awk '(\$3 == \"down\") { printf(\"/iocage/jails/%s\\\n\",\$1);}')\\\";
-    echo IOJAILS=\\\"\$(/usr/local/sbin/iocage list | awk '(\$3 == \"up\") { printf(\"%s:%s\\\n\",\$4,\$1);}')\\\";
+    echo IOJAILS=\\\"\$(/usr/local/sbin/iocage list | awk '(\$4 == \"up\") { printf(\"%s:%s\\\n\",\$5,\$2);}')\\\";
   fi
   if [ \$(mount -t zfs | wc -l) -gt 0 ]; then
     echo ZPOOLS=\\\"\$(/sbin/zpool list -H -o name)\\\";
@@ -333,10 +333,10 @@ cleanup_srv() {
 #######################
 is_zfs_path() {
     case "$1" in
-    /*) return 0 ;;
-    *) return 1 ;;
+    /*) return 1 ;;
+    *) return 0 ;;
     esac
-    return 0
+    return 1
 }
 
 # determine le rep destination pour une source
@@ -557,7 +557,29 @@ is_fstype() {
 #####################
 ### Jails FreeBSD ###
 #####################
+# retourne 0 si je jail est de type 'iocage'
+# + place les variables curjail et curjaildir
+is_iojail() {
+    [ -z "$IOJAILS" ] && return 1
+    UUID=${1%/root}
+    UUID=${UUID#/iocage/jails/}
+    [ -z "$UUID" ] && return 1
+    if echo "$IOJAILS" | fgrep -q ":$UUID"; then
+      for ioj in $IOJAILS; do
+        if echo "${ioj#*:}" | fgrep -q "$UUID"; then
+          # for iocage, change dest to $JAILSZFSDEST/$hostname and source to /root parent
+          curjail=${ioj%:*}
+          curjaildir=${1%/root}
+          curjailzsrc=$(get_zfs_src_for $curjaildir)
+          return 0
+        fi
+      done
+    fi
+    return 1
+}
 
+# retourne 0 si le chemin est celui d'un jail
+# + place les variables curjail et curjaildir
 is_jailed() {
     [ -z "$JAILS" ] && return 1
     [ "$1" = "/" ] && return 1
@@ -565,29 +587,16 @@ is_jailed() {
        ex=$(echo $j|sed 's@/@\\/@g')
        is_zfs_path $1 && test=$(get_srcdir_for_zfs $1) || test=$1
        if expr "$test" : "$ex" >/dev/null || expr "$test" : "$ex" > /dev/null; then
+           is_iojail $test && return 0
            curjail=${j##*/}
            curjaildir=${j}
+           curjailzsrc=""
            return 0
        fi
     done
     curjail=""
     curjaildir=""
-    return 1
-}
-
-# renvoie le hostname d'un jail iocage
-is_iojail() {
-    [ -z "$IOJAILS" ] && return 1
-    UUID=${1%/root}
-    UUID=${UUID#/iocage/jails/}
-    if echo "$IOJAILS" | fgrep -q ":$UUID"; then
-      for ioj in $IOJAILS; do
-        if echo "${ioj#*:}" | fgrep -q "$UUID"; then
-          echo "${ioj%:*}"
-          return 0
-        fi
-      done
-    fi
+    curjailzsrc=""
     return 1
 }
 
@@ -597,51 +606,51 @@ get_jail() {
     jaildir=$1
     is_jailed $jaildir || return 1
     is_excluded $jaildir && return 1
-    # si c'est un sous-repertoire, c'est pas ici ...
-    [ "$jaildir" = "$curjaildir" ] || return 1
+
     L=$TRACES/$NAME.jail.$curjail
 
-    h=$(is_iojail $jaildir)
-    say_begin " JAIL ${h:-$curjail} ("
+    say_begin " JAIL ${curjail} ("
 
-    zjdest=$JAILSZFSDEST/${h:-$curjail}
-    jdest=$JAILSDESTDIR/${h:-$curjail}
+    zjdest=$JAILSZFSDEST/${curjail}
+    jdest=$JAILSDESTDIR/${curjail}
 
-    h=$(is_iojail $jaildir)
-    # for iocage, change dest to $JAILSZFSDEST/$hostname and source toor /root parent
     if [ ! -z "$h" ]; then
         IOZSRC=$(get_zfs_src_for $jaildir)
         IOZSRC=${IOZSRC%/root}
-        get_zfs $jaildir $JAILSZFSDEST/$h $IOZSRC
+        get_zfs ${curjaildir} $JAILSZFSDEST/$h
         ret=$?
         now_exclude_zfs $IOZSRC
         say_end_with $ret ")"
         return $ret
-    elif is_fstype zfs $jaildir; then
-        get_zfs $jaildir $JAILSZFSDEST/$curjail
-        now_exclude_zfs $jaildir
-    elif is_fstype ufs $jaildir; then
-        get_ufs $jaildir $JAILSDESTDIR/$curjail $JAILSZFSDEST/$curjail
-        now_exclude $jaildir
+    elif is_fstype zfs ${curjaildir}; then
+        get_zfs ${curjaildir} $JAILSZFSDEST/$curjail ${curjailzsrc}
+        now_exclude_zfs ${curjaildir}
+    elif is_fstype ufs ${curjaildir}; then
+        get_ufs ${curjaildir} $JAILSDESTDIR/$curjail $JAILSZFSDEST/$curjail
+        now_exclude ${curjaildir}
     else
-        get_fs $jaildir $JAILSDESTDIR/$curjail
-        now_exclude $jaildir
+        get_fs ${curjaildir} $JAILSDESTDIR/$curjail
+        now_exclude ${curjaildir}
     fi
 
-    init_zfs_dest ${jaildir}-config $JAILSDESTDIR/${curjail}-config $JAILSZFSDEST/${curjail}-config
-    confdest="${jdest}-config"
-    doit $REMOTE_COMMAND $DEST "mkdir -p /tmp/${curjail}-config; \
-        ( [ -f /usr/local/etc/ezjail/${curjail} ] && cp /usr/local/etc/ezjail/${curjail} /tmp/${curjail}-config ) || \
-            grep ^jail_${curjail} /etc/rc.conf > /tmp/${curjail}-config/rc.conf; \
-        ( [ -f /etc/fstab.$curjail ] && cp /etc/fstab.$curjail /tmp/${curjail}-config ) || \
-            ( [ -f ${dir%$curjail}fstab.$curjail ] && cp ${dir%$curjail}fstab.$curjail /tmp/${curjail}-config ); \
-        hostname > /tmp/${curjail}-config/host; \
-        tar -C /tmp/${curjail}-config -cf - .; rm -rf /tmp/${curjail}-config" | tar -C $confdest -xf - >> $L 2>&1
-    cret=$?
-    if [ $cret -ne 0 ]; then
-        warn_admin $cret "get_jail($*)/get_config" $L "Pb pour recuperer la config du jail $curjail"
+    if ! is_iojail $jaildir; then
+        init_zfs_dest ${curjaildir}-config $JAILSDESTDIR/${curjail}-config $JAILSZFSDEST/${curjail}-config
+        confdest="${jdest}-config"
+        doit $REMOTE_COMMAND $DEST "mkdir -p /tmp/${curjail}-config; \
+            ( [ -f /usr/local/etc/ezjail/${curjail} ] && cp /usr/local/etc/ezjail/${curjail} /tmp/${curjail}-config ) || \
+                grep ^jail_${curjail} /etc/rc.conf > /tmp/${curjail}-config/rc.conf; \
+            ( [ -f /etc/fstab.$curjail ] && cp /etc/fstab.$curjail /tmp/${curjail}-config ) || \
+                ( [ -f ${dir%$curjail}fstab.$curjail ] && cp ${dir%$curjail}fstab.$curjail /tmp/${curjail}-config ); \
+            hostname > /tmp/${curjail}-config/host; \
+            tar -C /tmp/${curjail}-config -cf - .; rm -rf /tmp/${curjail}-config" | tar -C $confdest -xf - >> $L 2>&1
+        cret=$?
+        if [ $cret -ne 0 ]; then
+            warn_admin $cret "get_jail($*)/get_config" $L "Pb pour recuperer la config du jail $curjail"
+        fi
+        shellex $ZFS_SNAP_MAKE -q $confdest
+    else
+        cret=0
     fi
-    shellex $ZFS_SNAP_MAKE -q $confdest
     say_end_with $(($ret+$cret)) ")"
 }
 
