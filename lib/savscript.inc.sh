@@ -505,6 +505,7 @@ get_zfs() {
     ztarget=$1
     d=${2:-$(get_zfsdest_for $ztarget)}
     s=${3:-$(get_zfs_src_for $ztarget)}
+    dm=$(get_destdir_for $ztarget)
     L=$TRACES/$NAME.get_zfs.$(echo $1 | sed 's@/@_@g')
     if [ -z "$d" -o -z "$s" ]; then
         warn_admin 1 "get_zfs($*)" "" "get_zfs($1): impossible de trouver la destination($d) ou le repertoire ($s)"
@@ -515,23 +516,35 @@ get_zfs() {
     shellex $ZFS_SYNC_VOL $ZRECURSION $ZEXCLUDES $ZOPTS ${s}@${DEST} ${d} >> $L 2>&1
     ret=$?
     if [ $ret -ne 0 ]; then
-        MYZOPTS=$ZOPTS
-        if [ $ret -eq 7 ]; then
-            MYZOPTS=$ZOPTS" -j"
-            syslogue "warning" "get_zfs(${s}@${DEST}): Deuxieme tentative avec -j pour get_zfs(${s})"
-            shellex $ZFS_SYNC_VOL $ZRECURSION $ZEXCLUDES $MYZOPTS ${s}@${DEST} ${d} >> $L 2>&1
-            ret=$?
-        fi
-        if [ $ret -ne 0 -a $ret -ne 7 ] && grep -q "destination ${d}.* has been modified" $L; then
-            MYZOPTS=$MYZOPTS" -B"
-            syslogue "warning" "get_zfs(${s}@${DEST}): Deuxieme tentative avec -B pour get_zfs(${s})"
+        MYZOPTS=""
+        descpb="inconnu"
+        case $ret in
+            7) # pb snapshots desynchro
+                MYZOPTS=$ZOPTS" -j"
+                syslogue "warning" "get_zfs(${s}@${DEST}): Deuxieme tentative avec -j"
+                descpb="snapshots desynchro"
+            ;;
+            [56]) # volume impossible a creer
+                MYZOPTS=$ZOPTS" -c $dm"
+                syslogue "warning" "get_zfs(${s}@${DEST}): Deuxieme tentative avec -c $dm"
+                descpb="$ZFS_SYNC_VOL ne peut pas creer le volume tout seul"
+            ;;
+            [^0])
+                if grep -q "destination ${d}.* has been modified" $L; then
+                    MYZOPTS=$MYZOPTS" -B"
+                    syslogue "warning" "get_zfs(${s}@${DEST}): Deuxieme tentative avec -B"
+                    descpb="force rollback"
+                fi
+            ;;
+        esac
+        if [ -n "$MYZOPTS" ]; then
             shellex $ZFS_SYNC_VOL $ZRECURSION $ZEXCLUDES $MYZOPTS ${s}@${DEST} ${d} >> $L 2>&1
             ret=$?
         fi
         if [ $ret -eq 0 ]; then
-            warn_admin $ret "get_zfs($*)" $L "WARNING: probleme auto-corrige (snapshot manquant)"
+            warn_admin $ret "get_zfs($*)" $L "WARNING: probleme auto-corrige ($descpb)"
         else
-            warn_admin $ret "get_zfs($*)" $L "WARNING: Pb a la synchro du volume $1"
+            warn_admin $ret "get_zfs($*)" $L "WARNING: Pb a la synchro du volume $1 (return $ret)"
         fi
     fi
     # mettre le flag "readonly"
