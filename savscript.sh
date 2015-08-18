@@ -56,7 +56,7 @@ SAVZFSBASE=${SAVZFSBASE:-$(zfs list -H -o name "$SAVDESTBASE")}
 # mail a prevenir en cas de probleme
 ADMINMAIL=${ADMINMAIL:-"dgeo@ec-m.fr"}
 # repertoire de base pour le stockage temporaire des resultats
-TRACESDIRBASE=${TRACESDIRBASE:-"$TMPDIR/LOG.SAUV_TRACES"}
+TRACESDIRBASE=${TRACESDIRBASE:-"${TMPDIR:-/tmp}/LOG.SAUV_TRACES"}
 # max n. of concurrent jobs
 MAXJOBS=${MAXJOBS:-10}
 # syslog facility
@@ -65,6 +65,8 @@ export SYSLOG_FACILITY=${SYSLOG_FACILITY:-"user"}
 export SYSLOG_TAG=${SYSLOG_TAG:-"SAUVEGARDE"}
 # debug
 DEBUG=${DEBUG:-0}
+# locks
+STATEDIR=${STATEDIR:-"/var/run/savscript"}
 
 if ! zfs list -H -o name "$SAVZFSBASE" > /dev/null; then
   echo "Impossible de trouver le volume ZFS \"$SAVZFSBASE\"" >&2
@@ -78,6 +80,8 @@ if [ -e "$TRACES" ]; then
 fi
 mkdir $TRACES
 
+mkdir -p $STATEDIR
+
 if [ $DEBUG -ge 3 ]; then
   DEBUGADONF=1
   if [ $DEBUG -ge 2 ]; then
@@ -85,7 +89,7 @@ if [ $DEBUG -ge 3 ]; then
   fi
 fi
 
-export PATH RSYNC RSYNC_OPTS SAVDESTBASE SAVZFSBASE mydir TRACES REMOTE_COMMAND SSH_KEY DEBUG MACHINESDIR FSTYPES ZFS_SYNC_VOL ZFS_SNAP_MAKE TMPDIR
+export PATH RSYNC RSYNC_OPTS SAVDESTBASE SAVZFSBASE mydir TRACES REMOTE_COMMAND SSH_KEY DEBUG MACHINESDIR FSTYPES ZFS_SYNC_VOL ZFS_SNAP_MAKE TMPDIR STATEDIR
 
 ## checks
 if ! mount | grep -q 'on '$SAVDESTBASE ; then
@@ -109,7 +113,7 @@ if [ $# -gt 0 ]; then
   while [ $# -gt 0 ]; do
     # NEW
     if [ -f $MACHINESDIR/$1.conf ]; then
-      lockfile=${TMPDIR:-/tmp}/sauv.$1.encours
+      lockfile=$STATEDIR/sauv.$1.encours
       err=""
       if [ $DEBUG -gt 0 ]; then syslogue "debug" "time lockf -t 0 $lockfile /bin/sh ${DEBUGADONF:+-x }$mydir/lib/save_one.sh $MACHINESDIR/$1.conf"; fi
       time lockf -t 0 $lockfile /bin/sh ${DEBUGADONF:+-x }$mydir/lib/save_one.sh $MACHINESDIR/$1.conf
