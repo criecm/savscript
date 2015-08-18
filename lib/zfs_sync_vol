@@ -480,7 +480,7 @@ if [ -z "$DSTMOUNTBASE" ]; then
         if [ "$prop" = "mountpoint" -a "$val" != "none" -a "$val" != "legacy" ]; then
           echo -n " -o orig:mountpoint=$val";
         else
-          echo -n " -o $prop=$val";
+          echo -n " -o $prop=\"$val\"";
         fi
       done)${CREATEMOUNTPOINT:+" -o mountpoint=$CREATEMOUNTPOINT"}
 
