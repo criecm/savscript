@@ -484,7 +484,7 @@ get_ufs() {
         $REMOTE_COMMAND $DEST "umount $UFSMOUNTDIR || ( fuser -k -m $UFSMOUNTDIR ; umount -f $UFSMOUNTDIR ); \
             mdconfig -l -v | fgrep ${dir%/}/.snap/$UFSSNAPNAME | cut -f1 | xargs -L1 mdconfig -d -u && rm -f ${dir%/}/.snap/$UFSSNAPNAME && rmdir $UFSMOUNTDIR;" || syslogue "error" "AIIIE: snapshot impossible a supprimer: ${dir%/}/$UFSSNAPNAME monte sur $UFSMOUNTDIR" >> $L 2>&1
     else
-        [ ${SYSVER%%.*} -gt 5 ] && syslogue "notice" "get_ufs($dir): pas reussi a utiliser un snapshot :-/"
+        [ ${SYSVER%%.*} -gt 5 ] && syslogue "notice" "get_ufs(${dir}@${DEST}): pas reussi a utiliser un snapshot :-/"
         rsync_it ${dir%/}/ $mydestdir/ $L
         ret=$?
     fi
@@ -520,8 +520,8 @@ get_zfs() {
         descpb="inconnu"
         case $ret in
             7) # pb snapshots desynchro
-                MYZOPTS=$ZOPTS" -j"
-                syslogue "warning" "get_zfs(${s}@${DEST}): Deuxieme tentative avec -j"
+                MYZOPTS=$ZOPTS" -Bj"
+                syslogue "warning" "get_zfs(${s}@${DEST}): Deuxieme tentative avec -Bj"
                 descpb="snapshots desynchro"
             ;;
             [56]) # volume impossible a creer
