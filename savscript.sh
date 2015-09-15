@@ -157,12 +157,13 @@ else
 fi
 if [ -s $TRACES/msg ]; then
   if [ ! -z "$ADMINMAIL" ]; then
-    cat $TRACES/msg | mutt -s "[${SYSLOG_TAG}] Problemes avec" $ADMINMAIL -a $(find $TRACES ! -size 0 -type f)
+    TRACES_A_ENVOYER=$(grep "see " $TRACES/msg | sed 's/^.*see \(.*\)$/\1/')
+    SERVEURS_A_PB=$(grep '^[a-z0-9]*:' $TRACES/msg | cut -d: -f1 | sort -u)
+    cat $TRACES/msg | mutt -s "[${SYSLOG_TAG}] Problemes avec $SERVEURS_A_PB" $ADMINMAIL -a $TRACES_A_ENVOYER
   else
     syslogue "error" "Problemes avec:"
     cat $TRACES/msg | while read line; do syslogue "error" "  $line" ; done
   fi
-else
-  if [ $DEBUG -le 1 ]; then rm -rf $TRACES; fi
 fi
+if [ $DEBUG -le 1 ]; then rm -rf $TRACES; fi
 
