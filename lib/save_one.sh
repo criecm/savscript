@@ -35,7 +35,7 @@ if init_srv $DEST; then
     myret=0
 
     # JAILS
-    if [ ! -z "$SAV_JAILS" ]; then
+    if [ "$SAV_JAILS" = "YES" ]; then
         if [ ! -z "$JAILS" ]; then
             for jaildir in $JAILS; do
                 if ! is_excluded $jaildir; then
@@ -74,7 +74,7 @@ if init_srv $DEST; then
         if [ -s $TRACES/$NAME.corrections_montages.sh ]; then
             shellex $TRACES/$NAME.corrections_montages.sh >> $TRACES/$NAME.corrections_montages.log 2>&1 
             myret=$?
-            myret=$(($myret + $(wc -l $TRACES/$NAME.corrections_montages.log)))
+            myret=$(($myret + $(grep -v '^+' $TRACES/$NAME.corrections_montages.log | wc -l)))
             [ $myret -eq 0 ] || MOUNTPROBLEM="YES"
             warn_admin $myret "FULLZFS:correction_montages" "$TRACES/$NAME.corrections_montages.sh" "Certains points de montages dangereux ${MOUNTPROBLEM:+non }corriges ${MOUNTPROBLEM:+\!}"
         fi
@@ -84,7 +84,7 @@ if init_srv $DEST; then
             zfs list -H -o canmount,mountpoint,name,mounted -S name -r $ZFSDEST | awk '($1 ~ /^on$/ && $2 !~ /^legacy$/ && $4 ~ /^yes$/) { print $3 }' | xargs -L1 zfs umount
             mount | grep '^'$ZFSDEST'.* on '$DESTDIR | awk '{print $1}' | sort -r | xargs -L1 umount -f || mount -tzfs | grep '^'$ZFSDEST'.* on '$DESTDIR
             mount -tzfs $ZFSDEST/${ZFSSLASH#*/} $DESTDIR
-            zfs list -H -o canmount,mountpoint,name -r $ZFSDEST | awk '($1 ~ /^on$/ && $2 !~ /^legacy$/ && $2 ~ /'$(echo $DESTDIR|sed 's@/@\\/@g')'/) { print $3 }' | xargs -L1 zfs mount
+            zfs list -H -o canmount,mountpoint,name -r $ZFSDEST | awk '($1 ~ /^on$/ && $2 !~ /^(legacy|none)$/ && $2 ~ /'$(echo $DESTDIR|sed 's@/@\\/@g')'/) { print $3 }' | xargs -L1 zfs mount
         fi
 
     # AUTRES/MIXED FS SCENARIO
@@ -113,7 +113,7 @@ if init_srv $DEST; then
                     myret=$(( $myret + $? ))
                 ;;
                 esac
-            else
+#            else
 #               echo "$dir EXCLU"
             fi
 	    if [ $myret -ne 0 ]; then

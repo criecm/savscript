@@ -1,5 +1,7 @@
 #### Script de sauvegarde ZFS/*nix ####
 
+ Adresse du projet: https://forge.centrale-marseille.fr/projects/sauvegardes
+
 - creez une paire de cles ssh pour la sauvegarde: (la cle publique sera installee sur chaque client dans `~root/.ssh/authorized_keys`)
 
   `ssh-keygen -C "savscript@$(hostname -s)" -N '' -f ~/.ssh/id_rsa_sav`

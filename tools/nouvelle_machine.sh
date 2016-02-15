@@ -28,7 +28,7 @@ case "$SYSTEM" in
     FSLIST="`for fst in ext3 ext4 ext2 btrfs; do df -t $fst; done | tail -n +2 | awk '\''{print $6}'\''`"
 ;;
 "FreeBSD")
-    EXCLUDES="/usr/ports/distfiles /usr/obj"
+    EXCLUDES=""
     FSTYPES="ufs,zfs,ext3,ext2"
     JAILS=`jls | tail -n +2`
     FSLIST="`df -t'$FSTYPES' | tail -n +2 | awk '\''{print $6}'\''`"
@@ -72,6 +72,8 @@ if [ -f $savpath/machines.d/$MYNAME.conf ]; then
   echo "$savpath/machines.d/$MYNAME.conf existe (la supprimer avant pour la remplacer)"
   exit 1
 fi
+
+ssh -i $SSH_KEY -x -a root@$MYFQDN "echo ok" || echo "La conf /tmp/$MYNAME.conf n'est pas fonctionnelle"
 
 echo "On l'installe ? (ENTREE ou CTRL+C)"
 read p

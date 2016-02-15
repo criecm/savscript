@@ -56,7 +56,7 @@ SAVZFSBASE=${SAVZFSBASE:-$(zfs list -H -o name "$SAVDESTBASE")}
 # mail a prevenir en cas de probleme
 ADMINMAIL=${ADMINMAIL:-"dgeo@ec-m.fr"}
 # repertoire de base pour le stockage temporaire des resultats
-TRACESDIRBASE=${TRACESDIRBASE:-"/tmp/LOG.SAUV_TRACES"}
+TRACESDIRBASE=${TRACESDIRBASE:-"${TMPDIR:-/tmp}/LOG.SAUV_TRACES"}
 # max n. of concurrent jobs
 MAXJOBS=${MAXJOBS:-10}
 # syslog facility
@@ -65,6 +65,8 @@ export SYSLOG_FACILITY=${SYSLOG_FACILITY:-"user"}
 export SYSLOG_TAG=${SYSLOG_TAG:-"SAUVEGARDE"}
 # debug
 DEBUG=${DEBUG:-0}
+# locks
+STATEDIR=${STATEDIR:-"/var/run/savscript"}
 
 if ! zfs list -H -o name "$SAVZFSBASE" > /dev/null; then
   echo "Impossible de trouver le volume ZFS \"$SAVZFSBASE\"" >&2
@@ -72,19 +74,22 @@ if ! zfs list -H -o name "$SAVZFSBASE" > /dev/null; then
 fi
 
 TRACES=$TRACESDIRBASE.$$
+TMPDIR=$TRACES
 if [ -e "$TRACES" ]; then
   rm -rf $TRACES
 fi
 mkdir $TRACES
 
-if [ $DEBUG -gt 3 ]; then
+mkdir -p $STATEDIR
+
+if [ $DEBUG -ge 3 ]; then
   DEBUGADONF=1
   if [ $DEBUG -ge 2 ]; then
     MAXJOBS=1
   fi
 fi
 
-export PATH RSYNC RSYNC_OPTS SAVDESTBASE SAVZFSBASE mydir TRACES REMOTE_COMMAND SSH_KEY DEBUG MACHINESDIR FSTYPES ZFS_SYNC_VOL ZFS_SNAP_MAKE
+export PATH RSYNC RSYNC_OPTS SAVDESTBASE SAVZFSBASE mydir TRACES REMOTE_COMMAND SSH_KEY DEBUG MACHINESDIR FSTYPES ZFS_SYNC_VOL ZFS_SNAP_MAKE TMPDIR STATEDIR
 
 ## checks
 if ! mount | grep -q 'on '$SAVDESTBASE ; then
@@ -95,7 +100,7 @@ fi
 ## fonction de parallelisation
 waitupto() {
   MYMAX=${1:-$MAXJOBS}
-  while [ $(( $(pgrep -f '/bin/sh '$mydir'/lib/save_one.sh' | wc -l) )) -gt $(( MYMAX )) ]; do
+  while [ $(( $(pgrep -f '/bin/sh '${DEBUGADONF:+-x }$mydir'/lib/save_one.sh' | wc -l) )) -gt $(( MYMAX )) ]; do
     sleep 3
 #  echo -n "."
   done
@@ -108,7 +113,7 @@ if [ $# -gt 0 ]; then
   while [ $# -gt 0 ]; do
     # NEW
     if [ -f $MACHINESDIR/$1.conf ]; then
-      lockfile=${TMPDIR:-/tmp}/sauv.$1.encours
+      lockfile=$STATEDIR/sauv.$1.encours
       err=""
       if [ $DEBUG -gt 0 ]; then syslogue "debug" "time lockf -t 0 $lockfile /bin/sh ${DEBUGADONF:+-x }$mydir/lib/save_one.sh $MACHINESDIR/$1.conf"; fi
       time lockf -t 0 $lockfile /bin/sh ${DEBUGADONF:+-x }$mydir/lib/save_one.sh $MACHINESDIR/$1.conf
@@ -144,7 +149,7 @@ else
     serv=$(grep ^NAME $file|cut -d= -f2)
     syslogue "info" "savscript: debut ${serv} "$(date)
     date >> /var/log/savscript.$serv.log
-    /bin/sh $mydir/lib/save_one.sh $file >> /var/log/savscript.$serv.log 2>&1 &
+    /bin/sh $mydir/lib/save_one.sh $file >> /var/log/savscript.$serv.log || echo "Probleme avec $serv" >> $TRACES/msg 2>&1 &
   done
   waitupto 0
   TOTALS=$(($(date +%s) - $TBEGINALL))
@@ -152,12 +157,13 @@ else
 fi
 if [ -s $TRACES/msg ]; then
   if [ ! -z "$ADMINMAIL" ]; then
-    cat $TRACES/msg | mutt -s "[${SYSLOG_TAG}] Problemes avec" $ADMINMAIL -a $(find $TRACES ! -size 0 -type f)
+    TRACES_A_ENVOYER=$(grep "see " $TRACES/msg | sed 's/^.*see \(.*\)$/\1/')
+    SERVEURS_A_PB=$(grep '^[a-z0-9]*:' $TRACES/msg | cut -d: -f1 | sort -u)
+    cat $TRACES/msg | mutt -s "[${SYSLOG_TAG}] Problemes avec $SERVEURS_A_PB" $ADMINMAIL -a $TRACES_A_ENVOYER
   else
     syslogue "error" "Problemes avec:"
     cat $TRACES/msg | while read line; do syslogue "error" "  $line" ; done
   fi
-else
-  if [ $DEBUG -le 1 ]; then rm -rf $TRACES; fi
 fi
+if [ $DEBUG -le 1 ]; then rm -rf $TRACES; fi
 

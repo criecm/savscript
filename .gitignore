@@ -1,2 +1,4 @@
 savscript.conf
 machines.d/*.conf
+*.orig
+*.bak

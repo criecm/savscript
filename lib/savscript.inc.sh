@@ -167,7 +167,11 @@ echo \"FSLIST=\\\"\$(mount -t $FSTYPES | sed \$SEDOPT 's@^.*on (/[^ ]*) (\(|type
 if [ \"\$(uname -s)\" = \"FreeBSD\" -a \${SYSVER%%.*} -gt 6 ]; then
   echo JAILS=\\\"\$(/usr/sbin/jls | awk '(\$1 ~ /^[0-9]+\$/) { printf(\"%s\\\n\",\$4); }')\\\";
   if [ -x /usr/local/bin/ezjail-admin ]; then
-    echo INACTIVEJAILS=\\\"\$(cd /usr/local/etc/ezjail; ls | fgrep norun | xargs -L1 awk 'BEGIN { FS=\"\\\"\" } (\$1 ~ /rootdir/) { print \$2 }')\\\"
+    echo INACTIVEJAILS=\\\"\$(cd /usr/local/etc/ezjail; ls | fgrep norun | xargs -L1 awk 'BEGIN { FS=\"\\\"\" } (\$1 ~ /rootdir/) { print \$2 }')\\\";
+  fi
+  if [ -x /usr/local/sbin/iocage ]; then
+    echo INACTIVEJAILS=\\\"\$(/usr/local/sbin/iocage list | awk '(\$3 == \"down\") { printf(\"/iocage/jails/%s\\\n\",\$1);}')\\\";
+    echo IOJAILS=\\\"\$(/usr/local/sbin/iocage list | awk '(\$4 == \"up\") { printf(\"%s:%s\\\n\",\$5,\$2);}')\\\";
   fi
   if [ \$(mount -t zfs | wc -l) -gt 0 ]; then
     echo ZPOOLS=\\\"\$(/sbin/zpool list -H -o name)\\\";
@@ -256,33 +260,34 @@ fi" > $srvinfos 2> $TRACES/$NAME.init_srv
 
 get_rsync_daemon() {
     if [ "$RSYNC_DIRECT" = "YES" ]; then
-        eval $($REMOTE_COMMAND $DEST 'RSYNC_SRV_DIR=/tmp/SAV.rsyncd
-MYADDR=$(echo ${SSH_CONNECTION} | awk "{print \$3}")
-if [ -d $RSYNC_SRV_DIR ]; then
-  test -f $RSYNC_SRV_DIR/rsyncd.pid && kill $(cat $RSYNC_SRV_DIR/rsyncd.pid)
-  rm -rf $RSYNC_SRV_DIR
-  pgrep -f "rsync.*/tmp/SAV" && pkill -9 -f "rsync.*/tmp/SAV"
-fi
-if mkdir $RSYNC_SRV_DIR; then
-  cat > $RSYNC_SRV_DIR/rsyncd.conf << EOF
+        eval $($REMOTE_COMMAND $DEST "RSYNC_SRV_DIR=/tmp/SAV.rsyncd;
+MYADDR=\$(echo \${SSH_CONNECTION} | awk '{print \$3}');
+if [ -d \$RSYNC_SRV_DIR ]; then
+  test -s \$RSYNC_SRV_DIR/rsyncd.pid && kill \$(cat \$RSYNC_SRV_DIR/rsyncd.pid) > /dev/null 2>&1;
+  rm -rf \$RSYNC_SRV_DIR;
+  pgrep -f 'rsync.*/tmp/SAV' && pkill -9 -f 'rsync.*/tmp/SAV';
+fi;
+if mkdir \$RSYNC_SRV_DIR; then
+  cat > \$RSYNC_SRV_DIR/rsyncd.conf << EOF
 uid = root
 gid = 0
 use chroot = no
 max connections = 4
 syslog facility = daemon
-address = $MYADDR
-port = '$RSYNC_PORT'
-pid file = $RSYNC_SRV_DIR/rsyncd.pid
-log file = $RSYNC_SRV_DIR/rsyncd.log
+address = \$MYADDR
+port = '\$RSYNC_PORT'
+pid file = \$RSYNC_SRV_DIR/rsyncd.pid
+log file = \$RSYNC_SRV_DIR/rsyncd.log
 [root]
 	path = /
-	hosts allow = ${SSH_CLIENT%% *}
+	hosts allow = \${SSH_CLIENT%% *}
 	read only = true
 EOF
-  if rsync --daemon --config=$RSYNC_SRV_DIR/rsyncd.conf < /dev/null; then
-    echo RSYNC_SRV_PID="$(cat $RSYNC_SRV_DIR/rsyncd.pid)"
-  fi
-fi' 2> $TRACES/$NAME.get_rsync_daemon)
+  if rsync --daemon --config=\$RSYNC_SRV_DIR/rsyncd.conf < /dev/null; then
+    sleep 1;
+    echo RSYNC_SRV_PID=\$(cat $RSYNC_SRV_DIR/rsyncd.pid|grep -v ^$);
+  fi;
+fi" 2> $TRACES/$NAME.get_rsync_daemon) >> $TRACES/$NAME.get_rsync_daemon 2>&1
         if [ ! -z "$RSYNC_SRV_PID" ]; then
             RSYNC_SRV_BASE="${DEST}::root"
             return 0
@@ -313,6 +318,13 @@ cleanup_srv() {
         fi
         return $myres
     fi
+    # supprime les snapshots de transfert d'une autre source vers le serveur sauvegardé
+    if [ -z "$NEVER_CLEAN_ZFS_SPURIOUS_SNAPS" ]; then
+        for snap in $(zfs list -H -oname -r -t snapshot $ZFSDEST | grep '@.*-'$NAME'-2'); do
+            syslogue "info" "cleanup_srv(): destroying $snap"
+            zfs destroy -d $snap || warn_admin 1 "cleanup_srv(): unable to destroy $snap"
+        done
+    fi
     return 0
 }
 
@@ -321,10 +333,10 @@ cleanup_srv() {
 #######################
 is_zfs_path() {
     case "$1" in
-    /*) return 0 ;;
-    *) return 1 ;;
+    /*) return 1 ;;
+    *) return 0 ;;
     esac
-    return 0
+    return 1
 }
 
 # determine le rep destination pour une source
@@ -396,7 +408,7 @@ init_zfs_dest() {
             myzpath=${myzpath%/*}
         done
         for zc in $ztocreate; do
-            doit zfs create -o canmount=off -o orig:mountpoint=none -o orig:canmount=off $ztocreate
+            doit zfs create -o canmount=off -o orig:mountpoint=none -o orig:canmount=off $zc
         done
         zfs create -o orig:mountpoint=$mydir $myzfsdest
 
@@ -451,18 +463,18 @@ get_ufs() {
         UFSTS=$($REMOTE_COMMAND $DEST "\
             if [ -d \"${dir}\" ] && [ -d ${dir%/}/.snap ]; then \
               if mount -u -o snapshot ${dir%/}/.snap/$UFSSNAPNAME ${dir}; then \
-                TS=\$(TZ=UTC date +%s)
+                TS=\$(TZ=UTC date +%s); \
                 mkdir -p $UFSMOUNTDIR; \
                 if mount -r /dev/\$(mdconfig -a -t vnode -o readonly -f ${dir%/}/.snap/$UFSSNAPNAME) $UFSMOUNTDIR; then \
                   echo \$TS; \
                 else \
                   mdconfig -l -v | grep $UFSSNAPNAME | cut -f1 | xargs -L1 mdconfig -d -u ; \
                   rm -f ${dir%/}/.snap/$UFSSNAPNAME 2>/dev/null; \
-                fi \
+                fi; \
               else \
                 test -f ${dir%/}/.snap/$UFSSNAPNAME && rm -f ${dir%/}/.snap/$UFSSNAPNAME; \
-              fi \
-            fi") >> $L 2>&1 || return 1
+              fi; \
+            fi" 2>>$L ) >> $L
     fi
     init_zfs_dest $dir $2 $3
     if [ ! -z "$UFSTS" ]; then
@@ -472,7 +484,7 @@ get_ufs() {
         $REMOTE_COMMAND $DEST "umount $UFSMOUNTDIR || ( fuser -k -m $UFSMOUNTDIR ; umount -f $UFSMOUNTDIR ); \
             mdconfig -l -v | fgrep ${dir%/}/.snap/$UFSSNAPNAME | cut -f1 | xargs -L1 mdconfig -d -u && rm -f ${dir%/}/.snap/$UFSSNAPNAME && rmdir $UFSMOUNTDIR;" || syslogue "error" "AIIIE: snapshot impossible a supprimer: ${dir%/}/$UFSSNAPNAME monte sur $UFSMOUNTDIR" >> $L 2>&1
     else
-        [ ${SYSVER%%.*} -gt 5 ] && syslogue "notice" "get_ufs($dir): pas reussi a utiliser un snapshot :-/"
+        [ ${SYSVER%%.*} -gt 5 ] && syslogue "notice" "get_ufs(${dir}@${DEST}): pas reussi a utiliser un snapshot :-/"
         rsync_it ${dir%/}/ $mydestdir/ $L
         ret=$?
     fi
@@ -493,6 +505,7 @@ get_zfs() {
     ztarget=$1
     d=${2:-$(get_zfsdest_for $ztarget)}
     s=${3:-$(get_zfs_src_for $ztarget)}
+    dm=$(get_destdir_for $ztarget)
     L=$TRACES/$NAME.get_zfs.$(echo $1 | sed 's@/@_@g')
     if [ -z "$d" -o -z "$s" ]; then
         warn_admin 1 "get_zfs($*)" "" "get_zfs($1): impossible de trouver la destination($d) ou le repertoire ($s)"
@@ -503,23 +516,35 @@ get_zfs() {
     shellex $ZFS_SYNC_VOL $ZRECURSION $ZEXCLUDES $ZOPTS ${s}@${DEST} ${d} >> $L 2>&1
     ret=$?
     if [ $ret -ne 0 ]; then
-        MYZOPTS=$ZOPTS
-        if [ $ret -eq 7 ]; then
-            MYZOPTS=$ZOPTS" -j"
-            syslogue "warning" "get_zfs(${s}@${DEST}): Deuxieme tentative avec -j pour get_zfs(${s})"
-            shellex $ZFS_SYNC_VOL $ZRECURSION $ZEXCLUDES $MYZOPTS ${s}@${DEST} ${d} >> $L 2>&1
-            ret=$?
-        fi
-        if [ $ret -ne 0 -a $ret -ne 7 ] && grep -q "destination ${d}.* has been modified" $L; then
-            MYZOPTS=$MYZOPTS" -B"
-            syslogue "warning" "get_zfs(${s}@${DEST}): Deuxieme tentative avec -B pour get_zfs(${s})"
+        MYZOPTS=""
+        descpb="inconnu"
+        case $ret in
+            7) # pb snapshots desynchro
+                MYZOPTS=$ZOPTS" -Bj"
+                syslogue "warning" "get_zfs(${s}@${DEST}): Deuxieme tentative avec -Bj"
+                descpb="snapshots desynchro"
+            ;;
+            [56]) # volume impossible a creer
+                MYZOPTS=$ZOPTS" -c $dm"
+                syslogue "warning" "get_zfs(${s}@${DEST}): Deuxieme tentative avec -c $dm"
+                descpb="$ZFS_SYNC_VOL ne peut pas creer le volume tout seul"
+            ;;
+            [^0])
+                if grep -q "destination ${d}.* has been modified" $L; then
+                    MYZOPTS=$MYZOPTS" -B"
+                    syslogue "warning" "get_zfs(${s}@${DEST}): Deuxieme tentative avec -B"
+                    descpb="force rollback"
+                fi
+            ;;
+        esac
+        if [ -n "$MYZOPTS" ]; then
             shellex $ZFS_SYNC_VOL $ZRECURSION $ZEXCLUDES $MYZOPTS ${s}@${DEST} ${d} >> $L 2>&1
             ret=$?
         fi
         if [ $ret -eq 0 ]; then
-            warn_admin $ret "get_zfs($*)" $L "WARNING: probleme auto-corrige (snapshot manquant)"
+            warn_admin $ret "get_zfs($*)" $L "WARNING: probleme auto-corrige ($descpb)"
         else
-            warn_admin $ret "get_zfs($*)" $L "WARNING: Pb a la synchro du volume $1"
+            warn_admin $ret "get_zfs($*)" $L "WARNING: Pb a la synchro du volume $1 (return $ret)"
         fi
     fi
     # mettre le flag "readonly"
@@ -545,7 +570,29 @@ is_fstype() {
 #####################
 ### Jails FreeBSD ###
 #####################
+# retourne 0 si je jail est de type 'iocage'
+# + place les variables curjail et curjaildir
+is_iojail() {
+    [ -z "$IOJAILS" ] && return 1
+    UUID=${1%/root}
+    UUID=${UUID#/iocage/jails/}
+    [ -z "$UUID" ] && return 1
+    if echo "$IOJAILS" | fgrep -q ":$UUID"; then
+      for ioj in $IOJAILS; do
+        if echo "${ioj#*:}" | fgrep -q "$UUID"; then
+          # for iocage, change dest to $JAILSZFSDEST/$hostname and source to /root parent
+          curjail=${ioj%:*}
+          curjaildir=${1%/root}
+          curjailzsrc=$(get_zfs_src_for $curjaildir)
+          return 0
+        fi
+      done
+    fi
+    return 1
+}
 
+# retourne 0 si le chemin est celui d'un jail
+# + place les variables curjail et curjaildir
 is_jailed() {
     [ -z "$JAILS" ] && return 1
     [ "$1" = "/" ] && return 1
@@ -553,13 +600,16 @@ is_jailed() {
        ex=$(echo $j|sed 's@/@\\/@g')
        is_zfs_path $1 && test=$(get_srcdir_for_zfs $1) || test=$1
        if expr "$test" : "$ex" >/dev/null || expr "$test" : "$ex" > /dev/null; then
+           is_iojail $test && return 0
            curjail=${j##*/}
            curjaildir=${j}
+           curjailzsrc=""
            return 0
        fi
     done
     curjail=""
     curjaildir=""
+    curjailzsrc=""
     return 1
 }
 
@@ -569,39 +619,51 @@ get_jail() {
     jaildir=$1
     is_jailed $jaildir || return 1
     is_excluded $jaildir && return 1
-    # si c'est un sous-repertoire, c'est pas ici ...
-    [ "$jaildir" = "$curjaildir" ] || return 1
+
     L=$TRACES/$NAME.jail.$curjail
-    say_begin " JAIL $curjail ("
 
-    zjdest=$JAILSZFSDEST/$curjail
-    jdest=$JAILSDESTDIR/$curjail
+    say_begin " JAIL ${curjail} ("
 
-    if is_fstype zfs $jaildir; then
-        get_zfs $jaildir $JAILSZFSDEST/$curjail
-        now_exclude_zfs $jaildir
-    elif is_fstype ufs $jaildir; then
-        get_ufs $jaildir $JAILSDESTDIR/$curjail $JAILSZFSDEST/$curjail
-        now_exclude $jaildir
+    zjdest=$JAILSZFSDEST/${curjail}
+    jdest=$JAILSDESTDIR/${curjail}
+
+    if [ ! -z "$h" ]; then
+        IOZSRC=$(get_zfs_src_for $jaildir)
+        IOZSRC=${IOZSRC%/root}
+        get_zfs ${curjaildir} $JAILSZFSDEST/$h
+        ret=$?
+        now_exclude_zfs $IOZSRC
+        say_end_with $ret ")"
+        return $ret
+    elif is_fstype zfs ${curjaildir}; then
+        get_zfs ${curjaildir} $JAILSZFSDEST/$curjail ${curjailzsrc}
+        now_exclude_zfs ${curjaildir}
+    elif is_fstype ufs ${curjaildir}; then
+        get_ufs ${curjaildir} $JAILSDESTDIR/$curjail $JAILSZFSDEST/$curjail
+        now_exclude ${curjaildir}
     else
-        get_fs $jaildir $JAILSDESTDIR/$curjail
-        now_exclude $jaildir
+        get_fs ${curjaildir} $JAILSDESTDIR/$curjail
+        now_exclude ${curjaildir}
     fi
 
-    init_zfs_dest ${jaildir}-config $JAILSDESTDIR/${curjail}-config $JAILSZFSDEST/${curjail}-config
-    confdest="${jdest}-config"
-    doit $REMOTE_COMMAND $DEST "mkdir -p /tmp/${curjail}-config; \
-        ( [ -f /usr/local/etc/ezjail/${curjail} ] && cp /usr/local/etc/ezjail/${curjail} /tmp/${curjail}-config ) || \
-            grep ^jail_${curjail} /etc/rc.conf > /tmp/${curjail}-config/rc.conf; \
-        ( [ -f /etc/fstab.$curjail ] && cp /etc/fstab.$curjail /tmp/${curjail}-config ) || \
-            ( [ -f ${dir%$curjail}fstab.$curjail ] && cp ${dir%$curjail}fstab.$curjail /tmp/${curjail}-config ); \
-        hostname > /tmp/${curjail}-config/host; \
-        tar -C /tmp/${curjail}-config -cf - .; rm -rf /tmp/${curjail}-config" | tar -C $confdest -xf - >> $L 2>&1
-    cret=$?
-    if [ $cret -ne 0 ]; then
-        warn_admin $cret "get_jail($*)/get_config" $L "Pb pour recuperer la config du jail $curjail"
+    if ! is_iojail $jaildir; then
+        init_zfs_dest ${curjaildir}-config $JAILSDESTDIR/${curjail}-config $JAILSZFSDEST/${curjail}-config
+        confdest="${jdest}-config"
+        doit $REMOTE_COMMAND $DEST "mkdir -p /tmp/${curjail}-config; \
+            ( [ -f /usr/local/etc/ezjail/${curjail} ] && cp /usr/local/etc/ezjail/${curjail} /tmp/${curjail}-config ) || \
+                grep ^jail_${curjail} /etc/rc.conf > /tmp/${curjail}-config/rc.conf; \
+            ( [ -f /etc/fstab.$curjail ] && cp /etc/fstab.$curjail /tmp/${curjail}-config ) || \
+                ( [ -f ${dir%$curjail}fstab.$curjail ] && cp ${dir%$curjail}fstab.$curjail /tmp/${curjail}-config ); \
+            hostname > /tmp/${curjail}-config/host; \
+            tar -C /tmp/${curjail}-config -cf - .; rm -rf /tmp/${curjail}-config" | tar -C $confdest -xf - >> $L 2>&1
+        cret=$?
+        if [ $cret -ne 0 ]; then
+            warn_admin $cret "get_jail($*)/get_config" $L "Pb pour recuperer la config du jail $curjail"
+        fi
+        shellex $ZFS_SNAP_MAKE -q $confdest
+    else
+        cret=0
     fi
-    shellex $ZFS_SNAP_MAKE -q $confdest
     say_end_with $(($ret+$cret)) ")"
 }
 
