@@ -28,8 +28,8 @@ MYNAME=${MYNAME:-$(hostname -s)}
 VERBOSE=${VERBOSE:-0}
 SSH_CIPHERS="arcfour128,arcfour256,arcfour,blowfish-cbc,aes128-cbc,aes128-ctr,cast128-cbc"
 
-SRCZFSLIST=/tmp/srczfslist.$$
-DSTZFSLIST=/tmp/dstzfslist.$$
+SRCZFSLIST=${TMPDIR:-/var/tmp}/srczfslist.$$
+DSTZFSLIST=${TMPDIR:-/var/tmp}/dstzfslist.$$
 
 usage() {
   echo "# $0 [-k ssh_key] [-R [-x <file>]] [-B] [-u] [-U] [-I [-m <strftime format>]]"
