@@ -18,7 +18,7 @@ if [ $# -eq 0 ]; then
 fi
 
 if [ "$1" = "all" ]; then
-  machines=$(for i in $savpath/machines.d/*.conf; do eval $(grep ^DEST= $i); echo $DEST; done)
+  machines=$(for i in $savpath/machines.d/*.conf; do echo ${i%.conf} | sed 's@.*/@@g'; done)
   shift
 else
   machines=$@
