@@ -486,7 +486,7 @@ if [ -z "$DSTMOUNTBASE" ]; then
 
     DSTMOUNTBASE=${CREATEMOUNTPOINT:-$DSTMOUNTBASE}
     rm $DSTZFSLIST
-    if [ -z "$DSTMOUNTBASE" ]; then
+    if [ -z "$DSTMOUNTBASE" ] || [ "$DSTMOUNTBASE" = "none" ] || [ "$DSTMOUNTBASE" = "legacy" ]; then
       PARENTDEST=$($dstrocmd "zfs list -H -omountpoint ${DSTVOL%/*}" | grep -Ev '(none|legacy)')
       [ -z "$PARENTDEST" ] && erreur 5 "Impossible de determiner le repertoire de montage"
       DSTMOUNTBASE=${PARENTDEST}/${DSTVOL##*/}
