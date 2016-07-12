@@ -529,9 +529,9 @@ get_zfs() {
                 syslogue "warning" "get_zfs(${s}@${DEST}): Deuxieme tentative avec -c $dm"
                 descpb="$ZFS_SYNC_VOL ne peut pas creer le volume tout seul"
             ;;
-            [^0])
+            *)
                 if grep -q "destination ${d}.* has been modified" $L; then
-                    MYZOPTS=$MYZOPTS" -B"
+                    MYZOPTS=$ZOPTS" -B"
                     syslogue "warning" "get_zfs(${s}@${DEST}): Deuxieme tentative avec -B"
                     descpb="force rollback"
                 fi
