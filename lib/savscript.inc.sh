@@ -285,7 +285,7 @@ log file = \$RSYNC_SRV_DIR/rsyncd.log
 EOF
   if rsync --daemon --config=\$RSYNC_SRV_DIR/rsyncd.conf < /dev/null; then
     sleep 1;
-    echo RSYNC_SRV_PID=\$(cat $RSYNC_SRV_DIR/rsyncd.pid|grep -v ^$);
+    echo RSYNC_SRV_PID=\$(cat \$RSYNC_SRV_DIR/rsyncd.pid|grep -v ^$);
   fi;
 fi" 2> $TRACES/$NAME.get_rsync_daemon) >> $TRACES/$NAME.get_rsync_daemon 2>&1
         if [ ! -z "$RSYNC_SRV_PID" ]; then
