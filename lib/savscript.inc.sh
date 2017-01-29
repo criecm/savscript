@@ -245,7 +245,7 @@ fi" > $srvinfos 2> $TRACES/$NAME.init_srv
 
     if [ -z "$FULLZFS" ]; then
         get_rsync_daemon
-        if [ ! -z "$RSYNC_SRV_PID" ] && $RSYNC --port=$RSYNC_PORT ${DEST}:: >/dev/null 2>&1; then
+        if [ ! -z "$RSYNC_SRV_PID" ] && $RSYNC --port=$RSYNC_PORT ${DEST}:: >> $TRACES/$NAME.get_rsync_daemon 2>&1 ; then
             export RSYNC_COMMAND="$RSYNC --port=$RSYNC_PORT"
             RSYNC_SRV_BASE="${DEST}::root"
         else
@@ -265,7 +265,7 @@ MYADDR=\$(echo \${SSH_CONNECTION} | awk '{print \$3}');
 if [ -d \$RSYNC_SRV_DIR ]; then
   test -s \$RSYNC_SRV_DIR/rsyncd.pid && kill \$(cat \$RSYNC_SRV_DIR/rsyncd.pid) > /dev/null 2>&1;
   rm -rf \$RSYNC_SRV_DIR;
-  pgrep -f 'rsync.*/tmp/SAV' && pkill -9 -f 'rsync.*/tmp/SAV';
+  pgrep -qf 'rsync.*/tmp/SAV' && pkill -9 -f 'rsync.*/tmp/SAV';
 fi;
 if mkdir \$RSYNC_SRV_DIR; then
   cat > \$RSYNC_SRV_DIR/rsyncd.conf << EOF
@@ -275,7 +275,7 @@ use chroot = no
 max connections = 4
 syslog facility = daemon
 address = \$MYADDR
-port = '\$RSYNC_PORT'
+port = $RSYNC_PORT
 pid file = \$RSYNC_SRV_DIR/rsyncd.pid
 log file = \$RSYNC_SRV_DIR/rsyncd.log
 [root]
