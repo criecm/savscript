@@ -37,6 +37,12 @@ if init_srv $DEST; then
     # JAILS
     if [ "$SAV_JAILS" = "YES" ]; then
         if [ ! -z "$JAILS" ]; then
+            # get cloned origins
+            if [ ! -z "$IORIGIN" ]; then
+                for o in $IORIGIN; do
+            get_zfs $(get_srcdir_for_zfs $o) $JAILSZFSDEST/${o##*/} $o
+                done
+            fi
             for jaildir in $JAILS; do
                 if ! is_excluded $jaildir; then
                     get_jail $jaildir
@@ -116,7 +122,7 @@ if init_srv $DEST; then
 #            else
 #               echo "$dir EXCLU"
             fi
-	    if [ $myret -ne 0 ]; then
+        if [ $myret -ne 0 ]; then
               allret=$(( $allret + $myret ))
             fi
         done

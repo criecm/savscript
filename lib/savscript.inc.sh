@@ -170,8 +170,9 @@ if [ \"\$(uname -s)\" = \"FreeBSD\" -a \${SYSVER%%.*} -gt 6 ]; then
     echo INACTIVEJAILS=\\\"\$(cd /usr/local/etc/ezjail; ls | fgrep norun | xargs -L1 awk 'BEGIN { FS=\"\\\"\" } (\$1 ~ /rootdir/) { print \$2 }')\\\";
   fi
   if [ -x /usr/local/sbin/iocage ]; then
-    echo INACTIVEJAILS=\\\"\$(/usr/local/sbin/iocage list | awk '(\$3 == \"down\") { printf(\"/iocage/jails/%s\\\n\",\$1);}')\\\";
+    echo INACTIVEJAILS=\\\"\$(/usr/local/sbin/iocage list | awk '((\$4 == \"down\")&&(\$5 != \"basejail\")) { printf(\"/iocage/jails/%s\\\n\",\$2);}')\\\";
     echo IOJAILS=\\\"\$(/usr/local/sbin/iocage list | awk '(\$4 == \"up\") { printf(\"%s:%s\\\n\",\$5,\$2);}')\\\";
+    echo IORIGIN=\\\"\$(zfs list -H -o origin -d 1 -r /iocage/jails|grep -v ^- | sed 's/@.*$//' | sort -u)\\\";
   fi
   if [ \$(mount -t zfs | wc -l) -gt 0 ]; then
     echo ZPOOLS=\\\"\$(/sbin/zpool list -H -o name)\\\";
