@@ -51,7 +51,7 @@ if [ ! -z "$SYSLOG_FACILITY" ]; then
 fi
 # use: rsync_it srcdir/ dstdir/ logfile
 rsync_it() {
-    [ $DEBUG -ge 2 ] && RSYNC_OPTS=$RSYNC_OPTS" -v"
+    [ $DEBUG -ge 2 ] && RSYNC_OPTS=$RSYNC_OPTS" -vv"
     doit $RSYNC_COMMAND $RSYNC_OPTS $(rsync_excludes_for ${1}) ${RSYNC_SRV_BASE}${1} ${2} >> ${3} 2>&1
     res=$?
     case $res in
@@ -287,6 +287,7 @@ EOF
   if rsync --daemon --config=\$RSYNC_SRV_DIR/rsyncd.conf < /dev/null; then
     sleep 1;
     echo RSYNC_SRV_PID=\$(cat \$RSYNC_SRV_DIR/rsyncd.pid|grep -v ^$);
+    echo RSYNC_VERSION=\$(rsync --version | grep version | awk '{print \$NF}')
   fi;
 fi" 2> $TRACES/$NAME.get_rsync_daemon) >> $TRACES/$NAME.get_rsync_daemon 2>&1
         if [ ! -z "$RSYNC_SRV_PID" ]; then
