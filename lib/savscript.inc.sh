@@ -367,6 +367,9 @@ get_zfs_src_for() {
         if [ "$1" = "${zfsdesc%|*}" ]; then
             echo "${zfsdesc#*|}"
             return
+	elif [ "$1" = "${zfsdesc#*|}" ]; then
+	    echo "${zfsdesc#*|}"
+	    return
         fi
     done
     return 1
@@ -510,7 +513,7 @@ get_zfs() {
     dm=$(get_destdir_for $ztarget)
     L=$TRACES/$NAME.get_zfs.$(echo $1 | sed 's@/@_@g')
     if [ -z "$d" -o -z "$s" ]; then
-        warn_admin 1 "get_zfs($*)" "" "get_zfs($1): impossible de trouver la destination($d) ou le repertoire ($s)"
+        warn_admin 1 "get_zfs($*)" "" "get_zfs($1): impossible de trouver la destination($d) ou la source ZFS ($s)"
         return 1
     fi
     say_begin "ZFS:$ztarget"
