@@ -33,7 +33,7 @@ RSYNC="/usr/local/bin/rsync"
 # options par defaut pour rsync
 RSYNC_OPTS="-H -q -aux --delete --exclude .snap/ --exclude .zfs/"
 
-# Cle ssh a utiliser
+# Cle ssh a utiliser pour les sauvegardes
 SSH_KEY=/root/.ssh/id_rsa_sav
 
 # types de filesystems a sauvegarder

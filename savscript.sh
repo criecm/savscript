@@ -11,7 +11,7 @@
 #  - UFS: faire les snapshots au debut, les monter dans /tmp/mntsav (ou /mnt/tmpsav?) et y lancer rsyncd
 #
 PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin
-mydir=$(dirname $0)
+export mydir=$(dirname $0)
 
 if [ -z "$CONFIG_LOADED" ]; then
   . $mydir/savscript.conf
