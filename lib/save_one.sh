@@ -12,6 +12,7 @@ elif [ $# -ne 1 -o ! -f "$1" ]; then
 fi
 
 . $1
+
 ZFSDEST=${ZFSDEST:-"$SAVZFSBASE/$NAME"}
 DESTDIR=${DESTDIR:-"$SAVDESTBASE/$NAME"}
 JAILSZFSDEST=${JAILSZFSDEST:-"$SAVZFSBASE/jails"}
@@ -27,6 +28,7 @@ DEST=${DEST:-$NAME}
 if init_srv $DEST; then
     syslogue "info" "($NAME): start"
 
+    syslogue "debug" "($NAME): ZPOOLS=$ZPOOLS ZFSFSES=$ZFSFSES"
     if [ ! -z "$ZPOOLS" ]; then
         for pool in $ZPOOLS; do
             zfs_presnap $pool
@@ -61,12 +63,13 @@ if init_srv $DEST; then
         done 
         # si aucune exclusion + c'est le seul zpool, alors on lance en un coup
         if [ -n "$ONEZPOOL" ]; then
-            syslogue "info" "($NAME) FULLZFS: sauvegarde du pool ZFS $ONEZPOOL"
+            syslogue "info" "($NAME) ONEFULLZFS: sauvegarde du pool ZFS $ONEZPOOL"
             get_zfs / $ZFSDEST $ONEZPOOL
             myret=$(( $myret + $? ))
         else
             # si la racine est en ZFS, le pool ZFS vient a la racine
             if [ -n "$ZFSSLASH" ]; then
+                syslogue "debug" "($NAME) ZFSSLASH: get ${ZFSSLASH%%/*}"
                 get_zfs / $ZFSDEST ${ZFSSLASH%%/*}
             fi
             for fs in $ZFSFSES; do

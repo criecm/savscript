@@ -185,7 +185,6 @@ fi" > $srvinfos 2> $TRACES/$NAME.init_srv
         syslogue "crit" "Serveur $DEST down. Pas de sauvegarde"
         return 1
     fi
-    
     ### on a les infos du serveur: on les digere
     if [ "$SYSTEM" = "FreeBSD" ]; then
         #on cree le fichier d'exclusions pour zfs
@@ -197,7 +196,9 @@ fi" > $srvinfos 2> $TRACES/$NAME.init_srv
         # traduit les exclusions de repertoires en volumes zfs
         if [ ! -z "$EXCLUDES" -a ! -z "$ZFSFSES" ]; then
             for zfsdesc in $ZFSFSES; do
-                is_excluded "${zfsdesc%|*}" && now_exclude_zfs "${zfsdesc#*|}"
+                if is_excluded "${zfsdesc%|*}"; then
+                    now_exclude_zfs "${zfsdesc#*|}"
+                fi
             done
         fi
         for fsdesc in $FSLIST; do
@@ -214,24 +215,30 @@ fi" > $srvinfos 2> $TRACES/$NAME.init_srv
                 return 1
             fi
             # si ZFS only: pas besoin de demon rsync
-            if [ -n "$ZFS" -a -z "$UFS$OTHERFS" ]; then
+            if [ -n "$ZFS" ] && [ -z "$UFS$OTHERFS" ]; then
                 FULLZFS=YES
                 # si un seul zpool, c'est encore plus clair
                 if [ $(expr "$ZPOOLS" : ".* ") -eq 0 ]; then
                     ONEZPOOL=$ZPOOLS
                 else
                 # ... ou si un seul non-exclu
+                    npools=0
+		    pools=""
                     for pool in $ZPOOLS; do
                         if ! is_excluded $pool; then
                             npools=$(( $npools+1 ))
-                            pools=$pool
+                            pools="$pools $pool"
                         fi
                     done
                     if [ $npools -eq 1 ]; then
                         # on oublie simplement les autres pools s'ils sont exclus
-                        ONEZPOOL=$pools
+                        ONEZPOOL=${pools# }
+			ZPOOLS=${pools# }
                     fi
                 fi
+                echo "ONEZPOOL=$ONEZPOOL" >> $srvinfos
+                echo "ZPOOLS=$ZPOOLS" >> $srvinfos
+                echo "FULLZFS=$FULLZFS" >> $srvinfos
             fi
         fi
     fi
@@ -242,7 +249,6 @@ fi" > $srvinfos 2> $TRACES/$NAME.init_srv
         warn_admin 1 "init_srv($*)" "$TRACES/$NAME.init_srv" "Impossible d'initialiser la sauvegarde"
         return 1
     fi
-
 
     if [ -z "$FULLZFS" ]; then
         get_rsync_daemon
@@ -512,6 +518,7 @@ get_zfs() {
     s=${3:-$(get_zfs_src_for $ztarget)}
     dm=$(get_destdir_for $ztarget)
     L=$TRACES/$NAME.get_zfs.$(echo $1 | sed 's@/@_@g')
+    syslogue "debug" "($NAME) get_zfs($@): src=$s dst=$d"
     if [ -z "$d" -o -z "$s" ]; then
         warn_admin 1 "get_zfs($*)" "" "get_zfs($1): impossible de trouver la destination($d) ou la source ZFS ($s)"
         return 1
