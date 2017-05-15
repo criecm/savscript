@@ -201,9 +201,9 @@ fi" > $srvinfos 2> $TRACES/$NAME.init_srv
             done
         fi
         for fsdesc in $FSLIST; do
-            case ${fsdesc%:*} in
-                zfs) ZFS=YES ;;
-                ufs) UFS=YES ;;
+            case ${fsdesc} in
+                zfs:*) ZFS=YES ;;
+                ufs:*) UFS=YES ;;
                 *) OTHERFS=YES ;;
             esac
         done
