@@ -173,6 +173,10 @@ if [ \"\$(uname -s)\" = \"FreeBSD\" -a \${SYSVER%%.*} -gt 6 ]; then
     echo INACTIVEJAILS=\\\"\$(/usr/local/sbin/iocage list | awk '((\$4 == \"down\")&&(\$5 != \"basejail\")) { printf(\"/iocage/jails/%s\\\n\",\$2);}')\\\";
     echo IOJAILS=\\\"\$(/usr/local/sbin/iocage list | awk '(\$4 == \"up\") { printf(\"%s:%s\\\n\",\$5,\$2);}')\\\";
     echo IORIGIN=\\\"\$(zfs list -H -o origin -d 1 -r /iocage/jails|grep -v ^- | sed 's/@.*$//' | sort -u)\\\";
+  elif [ -x /usr/local/bin/iocage ]; then
+    echo INACTIVEJAILS=\\\"\$(/usr/local/bin/iocage list -h | awk '((\$3 == \"down\")&&(\$4 != \"basejail\")) { printf(\"/iocage/jails/%s\\\n\",\$2);}')\\\";
+    echo IOJAILS=\\\"\$(/usr/local/bin/iocage list -hl | awk '(\$4 == \"up\") { printf(\"%s:%s\\\n\",\$5,\$2);}')\\\";
+    echo IORIGIN=\\\"\$(zfs list -H -o origin -d 1 -r /iocage/jails|grep -v ^- | sed 's/@.*$//' | sort -u)\\\";
   fi
   if [ \$(mount -t zfs | wc -l) -gt 0 ]; then
     echo ZPOOLS=\\\"\$(/sbin/zpool list -H -o name)\\\";
@@ -639,26 +643,26 @@ get_jail() {
     zjdest=$JAILSZFSDEST/${curjail}
     jdest=$JAILSDESTDIR/${curjail}
 
-    if [ ! -z "$h" ]; then
+    if is_iojail $jaildir; then
         IOZSRC=$(get_zfs_src_for $jaildir)
         IOZSRC=${IOZSRC%/root}
-        get_zfs ${curjaildir} $JAILSZFSDEST/$h
+	get_zfs ${curjaildir} $JAILSZFSDEST/$curjail ${curjailsrc}
         ret=$?
         now_exclude_zfs $IOZSRC
         say_end_with $ret ")"
         return $ret
-    elif is_fstype zfs ${curjaildir}; then
-        get_zfs ${curjaildir} $JAILSZFSDEST/$curjail ${curjailzsrc}
-        now_exclude_zfs ${curjaildir}
-    elif is_fstype ufs ${curjaildir}; then
-        get_ufs ${curjaildir} $JAILSDESTDIR/$curjail $JAILSZFSDEST/$curjail
-        now_exclude ${curjaildir}
     else
-        get_fs ${curjaildir} $JAILSDESTDIR/$curjail
-        now_exclude ${curjaildir}
-    fi
+        if is_fstype zfs ${curjaildir}; then
+            get_zfs ${curjaildir} $JAILSZFSDEST/$curjail ${curjailzsrc}
+            now_exclude_zfs ${curjaildir}
+        elif is_fstype ufs ${curjaildir}; then
+            get_ufs ${curjaildir} $JAILSDESTDIR/$curjail $JAILSZFSDEST/$curjail
+            now_exclude ${curjaildir}
+        else
+            get_fs ${curjaildir} $JAILSDESTDIR/$curjail
+            now_exclude ${curjaildir}
+        fi
 
-    if ! is_iojail $jaildir; then
         init_zfs_dest ${curjaildir}-config $JAILSDESTDIR/${curjail}-config $JAILSZFSDEST/${curjail}-config
         confdest="${jdest}-config"
         doit $REMOTE_COMMAND $DEST "mkdir -p /tmp/${curjail}-config; \
@@ -673,8 +677,6 @@ get_jail() {
             warn_admin $cret "get_jail($*)/get_config" $L "Pb pour recuperer la config du jail $curjail"
         fi
         shellex $ZFS_SNAP_MAKE -q $confdest
-    else
-        cret=0
     fi
     say_end_with $(($ret+$cret)) ")"
 }
