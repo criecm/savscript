@@ -593,16 +593,25 @@ is_iojail() {
     UUID=${1%/root}
     UUID=${UUID#/iocage/jails/}
     [ -z "$UUID" ] && return 1
-    if echo "$IOJAILS" | fgrep -q ":$UUID"; then
-      for ioj in $IOJAILS; do
-        if echo "${ioj#*:}" | fgrep -q "$UUID"; then
-          # for iocage, change dest to $JAILSZFSDEST/$hostname and source to /root parent
-          curjail=${ioj%:*}
-          curjaildir=${1%/root}
-          curjailzsrc=$(get_zfs_src_for $curjaildir)
-          return 0
-        fi
-      done
+    if echo $UUID | grep -q '^[0-f]\{8\}-\([0-f]\{4\}-\)\{3\}[0-f]\{12\}$' && ! echo ${ioj%:*} | grep -q 'jail$'; then
+    # uuid-based iocage (< v0.9.9)
+      if echo "$IOJAILS" | fgrep -q ":$UUID"; then
+        for ioj in $IOJAILS; do
+          if echo "${ioj#*:}" | fgrep -q "$UUID"; then
+            # for iocage, change dest to $JAILSZFSDEST/$hostname and source to /root parent
+            curjail=${ioj%:*}
+            curjaildir=${1%/root}
+            curjailzsrc=$(get_zfs_src_for $curjaildir)
+            return 0
+          fi
+        done
+      fi
+    else
+    # name-based iocage (0.9.9+)
+      curjail=${ioj#*:}
+      curjaildir=${1%/root}
+      curjailsrc=$(get_zfs_src_for $curjaildir)
+      return 0
     fi
     return 1
 }
