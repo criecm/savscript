@@ -1,4 +1,4 @@
-#### Script de sauvegarde ZFS/*nix ####
+#### Script de sauvegarde ZFS/*n*x
 
  Adresse du projet: https://forge.centrale-marseille.fr/projects/sauvegardes
 
@@ -14,9 +14,10 @@
 
   `32 23 * * *	root	/chemin/vers/savscript.sh`
  
-### C'est quoi ce truc ? ###
+### Particularités
 
-- pas de client "lourd"
+- aucune installation sur le "client" (/bin/sh, rsync ou zfs)
 - pur /bin/sh, ssh, rsync (du connu :) et ZFS !
-- prevu/testé pour un serveur FreeBSD
-- a installer: mbuffer, rsync, fping, mutt
+- prevu/utilisé avec un serveur FreeBSD/ZFS et clients OpenBSD, FreeBSD, Linux divers
+- sauvegarde des jails freebsd a part (iocage ou jails "standard")
+- dependences côté serveur: rsync, fping, mutt (mbuffer conseillé)
