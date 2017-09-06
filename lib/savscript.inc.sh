@@ -608,7 +608,7 @@ is_iojail() {
       fi
     else
     # name-based iocage (0.9.9+)
-      curjail=${ioj#*:}
+      curjail=${UUID}
       curjaildir=${1%/root}
       curjailsrc=$(get_zfs_src_for $curjaildir)
       return 0
