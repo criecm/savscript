@@ -318,13 +318,13 @@ get_last_common_snapshot() {
       for dstfs in $(dst_zfs_list | cut -d'!' -f1 | grep '^'${DSTVOL}'/[^@]*$'); do
         if ! dst_zfs_list | cut -d'!' -f1 | grep -q '^'$dstfs'@'${snapcandidate}'$'; then
           if is_excluded ${SRCVOL}${dstfs#$DSTVOL}; then
-            warne "excluded fs existing on dest: $dstfs : delete ?"
+            warne "excluded fs existing on dest: $dstfs : should delete it ?"
 #            dst_cmd "zfs destroy -r $dstfs"
             rm $DSTZFSLIST
           elif src_zfs_list | cut -d'!' -f1 | sed 's|'${SRCVOL}'|'${DSTVOL}'|' | grep -q '^'$dstfs; then
             # this volume is part of $SRCVOL :(
             warne "snapshot ${snapcandidate} missing on $dstfs"
-            snapcandidate=""
+            #snapcandidate=""
             break
           fi
         fi
