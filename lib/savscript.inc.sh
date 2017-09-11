@@ -590,6 +590,7 @@ is_fstype() {
 # + place les variables curjail et curjaildir
 is_iojail() {
     [ -z "$IOJAILS" ] && return 1
+    echo $1 | fgrep -q iocage || return 1
     UUID=${1%/root}
     UUID=${UUID#/iocage/jails/}
     [ -z "$UUID" ] && return 1
