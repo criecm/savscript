@@ -138,6 +138,9 @@ say_end_with() {
     return $code
 }
 
+debug() {
+    echo $@ 1>&2
+}
 ##############
 ### Source ###
 ##############
@@ -601,17 +604,19 @@ is_iojail() {
           if echo "${ioj#*:}" | fgrep -q "$UUID"; then
             # for iocage, change dest to $JAILSZFSDEST/$hostname and source to /root parent
             curjail=${ioj%:*}
+            curjailsrc=$(get_zfs_src_for $curjaildir | sed 's@/root$@@')
             curjaildir=${1%/root}
-            curjailzsrc=$(get_zfs_src_for $curjaildir)
+echo "iocage < 0.9.9 curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
             return 0
           fi
         done
       fi
     else
-    # name-based iocage (0.9.9+)
+      # name-based iocage (0.9.9+) (UUID is name)
       curjail=${UUID}
+      curjailsrc=$(get_zfs_src_for $curjaildir | sed 's@/root$@@')
       curjaildir=${1%/root}
-      curjailsrc=$(get_zfs_src_for $curjaildir)
+echo "iocage 0.9.9+ curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
       return 0
     fi
     return 1
@@ -629,13 +634,13 @@ is_jailed() {
            is_iojail $test && return 0
            curjail=${j##*/}
            curjaildir=${j}
-           curjailzsrc=""
+           curjailsrc=""
            return 0
        fi
     done
     curjail=""
     curjaildir=""
-    curjailzsrc=""
+    curjailsrc=""
     return 1
 }
 
@@ -654,21 +659,25 @@ get_jail() {
     jdest=$JAILSDESTDIR/${curjail}
 
     if is_iojail $jaildir; then
-        IOZSRC=$(get_zfs_src_for $jaildir)
-        IOZSRC=${IOZSRC%/root}
-	get_zfs ${curjaildir} $JAILSZFSDEST/$curjail ${curjailsrc}
+        echo "iocage curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
+	      get_zfs ${curjaildir} $JAILSZFSDEST/$curjail ${curjailsrc}
         ret=$?
-        now_exclude_zfs $IOZSRC
+        now_exclude ${curjaildir}
+        now_exclude_zfs ${curjailsrc}
         say_end_with $ret ")"
         return $ret
     else
         if is_fstype zfs ${curjaildir}; then
-            get_zfs ${curjaildir} $JAILSZFSDEST/$curjail ${curjailzsrc}
-            now_exclude_zfs ${curjaildir}
+debug "jail zfs curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
+            get_zfs ${curjaildir} $JAILSZFSDEST/$curjail ${curjailsrc}
+            now_exclude ${curjaildir}
+            now_exclude_zfs ${curjailsrc}
         elif is_fstype ufs ${curjaildir}; then
+debug "jail ufs curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
             get_ufs ${curjaildir} $JAILSDESTDIR/$curjail $JAILSZFSDEST/$curjail
             now_exclude ${curjaildir}
         else
+debug "jail fs curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
             get_fs ${curjaildir} $JAILSDESTDIR/$curjail
             now_exclude ${curjaildir}
         fi
