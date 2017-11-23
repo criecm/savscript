@@ -219,7 +219,7 @@ missingvol() {
 }
 
 dst_run() {
-  debug "dst_run $dstcmd $*"
+  debug "dst_run $dstcmd $*" >&2
   if [ -z "$JUSTFORFUN" ]; then
     if [ -t 0 ]; then
       $dstcmd $*
@@ -230,26 +230,26 @@ dst_run() {
 }
 
 dst_ro_run() {
-  debug "dst_ro_run $dstcmd $*"
+  debug "dst_ro_run $dstcmd $*" >&2
   if [ -t 0 ]; then
-    $dstcmd $*
+    $dstcmd $@
   else
-    $dstcmd $*
+    $dstcmd $@
   fi
 }
 src_run() {
-  debug "src_run $srccmd $*"
+  debug "src_run $srccmd $*" >&2
   if [ -z "$JUSTFORFUN" ]; then
     if [ -t 0 ]; then
-      $srccmd $*
+      $srccmd $@
     else
-      $srccmd $*
+      $srccmd $@
     fi
   fi
 }
 
 src_ro_run() {
-  debug "src_ro_run $srccmd $*"
+  debug "src_ro_run $srccmd $*" >&2
   if [ -t 0 ]; then
     $srccmd $*
   else
