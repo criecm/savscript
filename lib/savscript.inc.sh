@@ -634,7 +634,7 @@ is_jailed() {
            is_iojail $test && return 0
            curjail=${j##*/}
            curjaildir=${j}
-           curjailsrc=""
+           curjailsrc=$(get_zfs_src_for $curjaildir | sed 's@/root$@@')
            return 0
        fi
     done
