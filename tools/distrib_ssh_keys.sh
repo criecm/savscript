@@ -44,8 +44,8 @@ for m in $machines; do
     IP=$(host -t a $DEST | fgrep 'has address' | awk '{print $NF}')
     IP6=$(host -t a $DEST | fgrep -i 'has IPv6 address' | awk '{print $NF}')
     echo "from=\"$MYIP\""
-    ssh-keygen -R $IP
-    ssh-keygen -R $IP6
+    [ ! -z "$IP" ] && ssh-keygen -R $IP
+    [ ! -z "$IP6" ] && ssh-keygen -R $IP6
     ssh-keygen -R $DEST
     echo "from=\"$MYIP\"$prepend $(cat $SSH_KEY.pub)" > /tmp/k
     cat /tmp/k | ssh -oStrictHostKeyChecking=no root@$DEST "cat >> .ssh/tmpkey; ( fgrep -v \"$(cut -d' ' -f2 $SSH_KEY.pub)\" .ssh/authorized_keys ${OLD_KEY:+| fgrep -v \"$(cut -d' ' -f2 $SSH_KEY.pub)\"} ; cat .ssh/tmpkey ) > .ssh/authorized_keys.new && mv .ssh/authorized_keys .ssh/authorized_keys.bak && mv .ssh/authorized_keys.new .ssh/authorized_keys && rm -f .ssh/tmpkey"
