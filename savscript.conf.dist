@@ -22,7 +22,8 @@ TRACESDIRBASE="${TMPDIR:-/tmp}/LOG.SAUV_TRACES"
 SAVDESTBASE="/sav"
 
 # volume zfs des sauvegardes
-SAVZFSBASE=$(zfs list -H -o name $SAVDESTBASE)
+# defaults to $(zfs list -H -o name $SAVDESTBASE)
+#SAVZFSBASE=
 
 # mail a prevenir en cas de probleme
 ADMINMAIL="admin@chez.moi"

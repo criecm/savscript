@@ -640,8 +640,22 @@ if ! src_zfs_list | cut -d'!' -f1 | grep -q '^'${SRCVOL}'$'; then
   fi
 fi
 
+DSTBASE=$(dst_ro_run "zfs list -H -o mountpoint ${DSTVOL%/*}")
+if ! echo $DSTBASE | grep -q ^/; then
+  volbase=${DSTVOL%/*}
+  DSTBASE=$(dst_ro_run "zfs list -H -o mountpoint ${volbase%/*}")/${volbase##*/}/${DSTVOL##*/}
+fi
+
+if [ -z "$DSTBASE" ] || ! echo $DSTBASE | grep -q ^/; then
+  erreur "Impossible de definir le point de montage parent de $DSTVOL :("
+fi
+
 DSTMOUNTBASE=$(dst_zfs_list | grep '^'${DSTVOL}'!' | cut -d'!' -f2 2>/dev/null)
-[ -z "$DSTMOUNTBASE" ] && DSTMOUNTBASE=$( dst_zfs_list | grep '^'${DSTVOL%/*}'$' | cut -d'!' -f2 2>/dev/null)"/"${DSTVOL##*/}
+
+echo "$DSTMOUNTBASE" | grep -q ^/ || DSTMOUNTBASE=$DSTBASE/${DSTVOL##*/}
+
+echo $DSTMOUNTBASE | grep -q ^$DSTBASE || erreur "$DSTMOUNTBASE n'est pas dans $DSTBASE ???"
+
 SRCMOUNTBASE=$(src_zfs_list | grep '^'${SRCVOL}'!' | cut -d'!' -f2 2>/dev/null)
 
 # create destination if needed && -C
@@ -753,11 +767,11 @@ if [ -z "$KEEPDSTSNAPS" -a $RET -eq 0 ]; then
 fi
 if [ ! -z "$SRCSNAPSTODEL" ]; then
   inform "Cleaning snapshots${SRCHOST:+ on $SRCHOST}: $SRCSNAPSTODEL" 
-  src_run 'for snap in '$SRCSNAPSTODEL'; do zfs destroy '${GRECURSE:+-r}' -d $snap; done'
+  src_run 'for snap in '$SRCSNAPSTODEL'; do zfs destroy '${GRECURSE:+-r}' -d $snap; done | fgrep -v "not exist"'
 fi
 if [ ! -z "$DSTSNAPSTODEL" ]; then
   inform "Cleaning snapshots${DSTHOST:+ on $DSTHOST}: $DSTSNAPSTODEL" 
-  dst_run 'for snap in '$DSTSNAPSTODEL'; do zfs destroy '${GRECURSE:+-r}' -d $snap; done'
+  dst_run 'for snap in '$DSTSNAPSTODEL'; do zfs destroy '${GRECURSE:+-r}' -d $snap; done | fgrep -v "not exist"'
 fi
 
 # write newsnap name on lastbackup:$MYNAME property if ok

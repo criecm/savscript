@@ -62,6 +62,7 @@ if init_srv $DEST; then
             is_excluded ${testfs%|*} && now_exclude_zfs ${testfs#*|}
         done 
         # si aucune exclusion + c'est le seul zpool, alors on lance en un coup
+        export DONOTEXCLUDEZFS="for now"
         if [ -n "$ONEZPOOL" ]; then
             syslogue "info" "($NAME) ONEFULLZFS: sauvegarde du pool ZFS $ONEZPOOL"
             get_zfs / $ZFSDEST $ONEZPOOL
@@ -80,7 +81,7 @@ if init_srv $DEST; then
             done
         fi
         # modification des points de montage si besoin (protection du systeme local !)
-        zfs list -H -o mountpoint,name -r $ZFSDEST | awk '($1 !~ /^'$(echo $SAVDESTBASE|sed 's@/@\\/@g')'/ && $1 !~ /(legacy|none)/) { gsub("^/$","",$1); printf("zfs set mountpoint='$DESTDIR'%s %s; zfs set orig:mountpoint=/%s %s;\n",$1,$2,$1,$2); }' > $TRACES/$NAME.corrections_montages.sh 2>> $TRACES/$NAME.corrections_montages.log
+        zfs list -H -o mountpoint,name,jailed,canmount -r $ZFSDEST | awk '($1 !~ /^'$(echo $DESTDIR|sed 's@/@\\/@g')'/ && $1 ~ /^\// && $3 ~ /off/ && $4 ~ /on/) { gsub("^/","",$1); printf("zfs set mountpoint='$DESTDIR'/%s %s; zfs set orig:mountpoint=/%s %s;\n",$1,$2,$1,$2); }' > $TRACES/$NAME.corrections_montages.sh 2>> $TRACES/$NAME.corrections_montages.log
         if [ -s $TRACES/$NAME.corrections_montages.sh ]; then
             shellex $TRACES/$NAME.corrections_montages.sh >> $TRACES/$NAME.corrections_montages.log 2>&1 
             myret=$?

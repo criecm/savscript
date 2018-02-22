@@ -571,7 +571,7 @@ get_zfs() {
     # TEMP: reverse ca: readonly s'herite
     #zfs get -H -o name,source -t filesystem -r readonly ${d} | grep -v '^'${d}'	' | cut -f 1 | xargs -L1 zfs inherit readonly
     zfs get -H -o name,value -t filesystem readonly ${d} | grep -q 'off$' && zfs set readonly=on ${d}
-    now_exclude_zfs $s
+    [ -n "$DONOTEXCLUDEZFS" ] || now_exclude_zfs $s
     say_end_with $ret
 }
 
