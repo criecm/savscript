@@ -172,14 +172,10 @@ if [ \"\$(uname -s)\" = \"FreeBSD\" -a \${SYSVER%%.*} -gt 6 ]; then
   if [ -x /usr/local/bin/ezjail-admin ]; then
     echo INACTIVEJAILS=\\\"\$(cd /usr/local/etc/ezjail; ls | fgrep norun | xargs -L1 awk 'BEGIN { FS=\"\\\"\" } (\$1 ~ /rootdir/) { print \$2 }')\\\";
   fi
-  if [ -x /usr/local/sbin/iocage ]; then
-    echo INACTIVEJAILS=\\\"\$(/usr/local/sbin/iocage list | awk '((\$4 == \"down\")&&(\$5 != \"basejail\")) { printf(\"/iocage/jails/%s\\\n\",\$2);}')\\\";
-    echo IOJAILS=\\\"\$(/usr/local/sbin/iocage list | awk '(\$4 == \"up\") { printf(\"%s:%s\\\n\",\$5,\$2);}')\\\";
-    echo IORIGIN=\\\"\$(zfs list -H -o origin -d 1 -r /iocage/jails|grep -v ^- | sed 's/@.*$//' | sort -u)\\\";
-  elif [ -x /usr/local/bin/iocage ]; then
+  if [ -x /usr/local/bin/iocage ]; then
     echo INACTIVEJAILS=\\\"\$(/usr/local/bin/iocage list -h | awk '((\$3 == \"down\")&&(\$4 != \"basejail\")) { printf(\"/iocage/jails/%s\\\n\",\$2);}')\\\";
     echo IOJAILS=\\\"\$(/usr/local/bin/iocage list -hl | awk '(\$4 == \"up\") { printf(\"%s:%s\\\n\",\$5,\$2);}')\\\";
-    echo IORIGIN=\\\"\$(zfs list -H -o origin -d 1 -r /iocage/jails|grep -v ^- | sed 's/@.*$//' | sort -u)\\\";
+    echo IORIGIN=\\\"\$(zfs list -H -o origin -d 2 -r /iocage/jails|grep -v ^- | sed 's/@.*$//; s/\/root$//;' | sort -u )\\\";
   fi
   if [ \$(mount -t zfs | wc -l) -gt 0 ]; then
     echo ZPOOLS=\\\"\$(/sbin/zpool list -H -o name)\\\";
@@ -597,29 +593,12 @@ is_iojail() {
     UUID=${1%/root}
     UUID=${UUID#/iocage/jails/}
     [ -z "$UUID" ] && return 1
-    if echo $UUID | grep -q '^[0-f]\{8\}-\([0-f]\{4\}-\)\{3\}[0-f]\{12\}$' && ! echo ${ioj%:*} | grep -q 'jail$'; then
-    # uuid-based iocage (< v0.9.9)
-      if echo "$IOJAILS" | fgrep -q ":$UUID"; then
-        for ioj in $IOJAILS; do
-          if echo "${ioj#*:}" | fgrep -q "$UUID"; then
-            # for iocage, change dest to $JAILSZFSDEST/$hostname and source to /root parent
-            curjail=${ioj%:*}
-            curjailsrc=$(get_zfs_src_for $curjaildir | sed 's@/root$@@')
-            curjaildir=${1%/root}
-echo "iocage < 0.9.9 curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
-            return 0
-          fi
-        done
-      fi
-    else
-      # name-based iocage (0.9.9+) (UUID is name)
-      curjail=${UUID}
-      curjailsrc=$(get_zfs_src_for $curjaildir | sed 's@/root$@@')
-      curjaildir=${1%/root}
-echo "iocage 0.9.9+ curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
-      return 0
-    fi
-    return 1
+    # name-based iocage (0.9.9+) (UUID is name)
+    curjail=${UUID}
+    curjailsrc=$(get_zfs_src_for $curjaildir | sed 's@/root$@@')
+    curjaildir=${1%/root}
+#echo "iocage 0.9.9+ curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
+    return 0
 }
 
 # retourne 0 si le chemin est celui d'un jail

@@ -43,7 +43,7 @@ if init_srv $DEST; then
             # get cloned origins
             if [ ! -z "$IORIGIN" ]; then
                 for o in $IORIGIN; do
-                    get_zfs $(get_srcdir_for_zfs $o) $JAILSZFSDEST/${o##*/} $o
+                    get_zfs $(get_srcdir_for_zfs $o) $JAILSZFSDEST/${NAME}_${o##*/} $o
                 done
             fi
             for jaildir in $JAILS; do
