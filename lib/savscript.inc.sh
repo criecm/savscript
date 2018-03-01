@@ -139,7 +139,7 @@ say_end_with() {
 }
 
 debug() {
-    echo $@ 1>&2
+  [ $DEBUG -gt 0 ] && echo $@ 1>&2
 }
 ##############
 ### Source ###
@@ -515,6 +515,7 @@ get_zfs() {
     if [ "$1" = "legacy" ]; then
         return
     fi
+    local ret=0
 #    echo "get_zfs $*" >> /tmp/$(echo "$DEST $*" | sed 's/[^-a-zA-Z0-9]/_/g')
     ztarget=$1
     d=${2:-$(get_zfsdest_for $ztarget)}
@@ -632,32 +633,35 @@ get_jail() {
 
     L=$TRACES/$NAME.jail.$curjail
 
-    say_begin " JAIL ${curjail} ("
+    debug "JAIL $curjail: BEGIN"
 
     zjdest=$JAILSZFSDEST/${curjail}
     jdest=$JAILSDESTDIR/${curjail}
 
+    local ret=0
+    local cret=0
     if is_iojail $jaildir; then
-        echo "iocage curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
+debug "iocage curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
 	      get_zfs ${curjaildir} $JAILSZFSDEST/$curjail ${curjailsrc}
         ret=$?
         now_exclude ${curjaildir}
         now_exclude_zfs ${curjailsrc}
-        say_end_with $ret ")"
-        return $ret
     else
         if is_fstype zfs ${curjaildir}; then
 debug "jail zfs curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
             get_zfs ${curjaildir} $JAILSZFSDEST/$curjail ${curjailsrc}
+            ret=$?
             now_exclude ${curjaildir}
             now_exclude_zfs ${curjailsrc}
         elif is_fstype ufs ${curjaildir}; then
 debug "jail ufs curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
             get_ufs ${curjaildir} $JAILSDESTDIR/$curjail $JAILSZFSDEST/$curjail
+            ret=$?
             now_exclude ${curjaildir}
         else
 debug "jail fs curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
             get_fs ${curjaildir} $JAILSDESTDIR/$curjail
+            ret=$?
             now_exclude ${curjaildir}
         fi
 
@@ -670,12 +674,12 @@ debug "jail fs curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
                 ( [ -f ${dir%$curjail}fstab.$curjail ] && cp ${dir%$curjail}fstab.$curjail /tmp/${curjail}-config ); \
             hostname > /tmp/${curjail}-config/host; \
             tar -C /tmp/${curjail}-config -cf - .; rm -rf /tmp/${curjail}-config" | tar -C $confdest -xf - >> $L 2>&1
-        cret=$?
-        if [ $cret -ne 0 ]; then
+        ret=$?
+        if [ $ret -ne 0 ]; then
             warn_admin $cret "get_jail($*)/get_config" $L "Pb pour recuperer la config du jail $curjail"
         fi
         shellex $ZFS_SNAP_MAKE -q $confdest
     fi
-    say_end_with $(($ret+$cret)) ")"
+    debug "JAIL $curjail: END($(($ret+${cret})))"
 }
 
