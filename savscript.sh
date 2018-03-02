@@ -149,8 +149,9 @@ else
     serv=$(grep ^NAME $file|cut -d= -f2)
     syslogue "info" "savscript: debut ${serv} "$(date)
     TSRV0=$(date +%s)
+    lockfile=$STATEDIR/sauv.$serv.encours
     (date; echo -n " ") >> /var/log/savscript.$serv.log
-    /bin/sh $mydir/lib/save_one.sh $file >> /var/log/savscript.$serv.log || echo "Probleme avec $serv" >> $TRACES/msg 2>&1 &
+    lockf -t 0 $lockfile /bin/sh $mydir/lib/save_one.sh $file >> /var/log/savscript.$serv.log || echo "Probleme avec $serv" >> $TRACES/msg 2>&1 &
     (echo ". elapsed: "$(($(date +%s) - TSRV0))"s"; ) >> /var/log/savscript.$serv.log
   done
   waitupto 0
