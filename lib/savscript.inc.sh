@@ -519,10 +519,8 @@ get_zfs() {
 #    echo "get_zfs $*" >> /tmp/$(echo "$DEST $*" | sed 's/[^-a-zA-Z0-9]/_/g')
     ztarget=$1
     d=${2:-$(get_zfsdest_for $ztarget)}
-    if [ -z "$d" ]; then
-        dd=$(get_zfsdest_for $ztarget | sed 's@/[^/]*$@@')
-        zfs create -o mountpoint=none $dd
-        d=$(get_zfsdest_for $ztarget)
+    if [ ! -z "$d" ]; then
+        [ -n "$(zfs list -H -oname ${d%/*})" ] || zfs create -o canmount=off ${d%/*}
     fi
     s=${3:-$(get_zfs_src_for $ztarget)}
     dm=$(get_destdir_for $ztarget)
