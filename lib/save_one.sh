@@ -20,10 +20,19 @@ JAILSDESTDIR=${JAILSDESTDIR:-"$SAVDESTBASE/jails"}
 RSYNC_PORT=${RSYNC_PORT:-42873}
 #RSYNC_DIRECT=${RSYNC_DIRECT:-"YES"}
 RSYNC_DIRECT="NO"
+SAV_JAILS=${SAV_JAILS:-NO}
 
 . $mydir/lib/savscript.inc.sh
 
 DEST=${DEST:-$NAME}
+
+justdoit() {
+  if [ ! -z "$JUSTSAYIT" ]; then
+    echo "$@" >&2
+  else
+    eval $@
+  fi
+}
 
 if init_srv $DEST; then
     syslogue "info" "($NAME): start"
@@ -31,7 +40,7 @@ if init_srv $DEST; then
     syslogue "debug" "($NAME): ZPOOLS=$ZPOOLS ZFSFSES=$ZFSFSES"
     if [ ! -z "$ZPOOLS" ]; then
         for pool in $ZPOOLS; do
-            zfs_presnap $pool
+            justdoit zfs_presnap $pool
         done
     fi
 
@@ -48,7 +57,7 @@ if init_srv $DEST; then
             fi
             for jaildir in $JAILS; do
                 if ! is_excluded $jaildir; then
-                    get_jail $jaildir
+                    justdoit get_jail $jaildir
                     myret=$(( $ret + $? ))
                 fi
             done
@@ -62,20 +71,20 @@ if init_srv $DEST; then
             is_excluded ${testfs%|*} && now_exclude_zfs ${testfs#*|}
         done 
         # si aucune exclusion + c'est le seul zpool, alors on lance en un coup
-        export DONOTEXCLUDEZFS="for now"
+        #export DONOTEXCLUDEZFS="for now"
         if [ -n "$ONEZPOOL" ]; then
             syslogue "info" "($NAME) ONEFULLZFS: sauvegarde du pool ZFS $ONEZPOOL"
-            get_zfs / $ZFSDEST $ONEZPOOL
+            justdoit get_zfs / $ZFSDEST $ONEZPOOL
             myret=$(( $myret + $? ))
         else
             # si la racine est en ZFS, le pool ZFS vient a la racine
             if [ -n "$ZFSSLASH" ]; then
                 syslogue "debug" "($NAME) ZFSSLASH: get ${ZFSSLASH%%/*}"
-                get_zfs / $ZFSDEST ${ZFSSLASH%%/*}
+                justdoit get_zfs / $ZFSDEST ${ZFSSLASH%%/*}
             fi
             for fs in $ZFSFSES; do
                 if ! is_excluded ${fs%|*} && ! is_excluded ${fs#*|} && [ "${fs%|*}" != "none" ]; then
-                    get_zfs ${fs%|*} 
+                    justdoit get_zfs ${fs%|*}
                     myret=$(( $myret + $? ))
                 fi
             done
@@ -83,7 +92,7 @@ if init_srv $DEST; then
         # modification des points de montage si besoin (protection du systeme local !)
         zfs list -H -o mountpoint,name,jailed,canmount -r $ZFSDEST | awk '($1 !~ /^'$(echo $DESTDIR|sed 's@/@\\/@g')'/ && $1 ~ /^\// && $3 ~ /off/ && $4 ~ /on/) { gsub("^/","",$1); printf("zfs set mountpoint='$DESTDIR'/%s %s; zfs set orig:mountpoint=/%s %s;\n",$1,$2,$1,$2); }' > $TRACES/$NAME.corrections_montages.sh 2>> $TRACES/$NAME.corrections_montages.log
         if [ -s $TRACES/$NAME.corrections_montages.sh ]; then
-            shellex $TRACES/$NAME.corrections_montages.sh >> $TRACES/$NAME.corrections_montages.log 2>&1 
+            justdoit shellex $TRACES/$NAME.corrections_montages.sh >> $TRACES/$NAME.corrections_montages.log 2>&1
             myret=$?
             myret=$(($myret + $(grep -v '^+' $TRACES/$NAME.corrections_montages.log | wc -l)))
             [ $myret -eq 0 ] || MOUNTPROBLEM="YES"
@@ -112,17 +121,17 @@ if init_srv $DEST; then
                 # UFS: ca peut faire des snapshots, mais pas beaucoup
                 #   on en fait un pour le rsync, puis on le detruit
                 ufs)
-                    get_ufs $dir
+                    justdoit get_ufs $dir
                     myret=$(( $myret + $? ))
                 ;;
                 # ZFS a son script qui fait tout ca tres bien (snapshot a la source)
                 zfs)
-                    get_zfs $dir
+                    justdoit get_zfs $dir
                     myret=$(( $myret + $? ))
                 ;;
                 # ext[234], autres: un simple rsync + snapshot
                 *)
-                    get_fs $dir
+                    justdoit get_fs $dir
                     myret=$(( $myret + $? ))
                 ;;
                 esac
@@ -140,7 +149,7 @@ if init_srv $DEST; then
           syslogue "notice" "($NAME) done with warnings :-/"
         fi
     fi
-    cleanup_srv
+    justdoit cleanup_srv
     exit $allret
 else
     syslogue "error" "Pas de sauvegarde pour $NAME cette fois :-("
