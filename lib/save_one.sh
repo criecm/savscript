@@ -89,6 +89,13 @@ if init_srv $DEST; then
                 fi
             done
         fi
+	# corrige une racine ZFS freebsd (zroot/ROOT/default => /)
+	if [ -n "$ZFSSLASH" ]; then
+            [ "$(zfs list -H -o mountpoint $ZFSDEST)" = "none" ] || zfs set mountpoint=none $ZFSDEST
+	    if zfs list -H -o mountpoint $ZFSDEST/${ZFSSLASH#*/} | grep -q /$; then
+                zfs set mountpoint=$DESTDIR $ZFSDEST/${ZFSSLASH#*/}
+            fi
+        fi
         # modification des points de montage si besoin (protection du systeme local !)
         zfs list -H -o mountpoint,name,jailed,canmount -r $ZFSDEST | awk '($1 !~ /^'$(echo $DESTDIR|sed 's@/@\\/@g')'/ && $1 ~ /^\// && $3 ~ /off/ && $4 ~ /on/) { gsub("^/","",$1); printf("zfs set mountpoint='$DESTDIR'/%s %s; zfs set orig:mountpoint=/%s %s;\n",$1,$2,$1,$2); }' > $TRACES/$NAME.corrections_montages.sh 2>> $TRACES/$NAME.corrections_montages.log
         if [ -s $TRACES/$NAME.corrections_montages.sh ]; then
