@@ -21,6 +21,7 @@ RSYNC_PORT=${RSYNC_PORT:-42873}
 #RSYNC_DIRECT=${RSYNC_DIRECT:-"YES"}
 RSYNC_DIRECT="NO"
 SAV_JAILS=${SAV_JAILS:-NO}
+CANSKIP=${CANSKIP:-0}
 
 . $mydir/lib/savscript.inc.sh
 
@@ -159,6 +160,8 @@ if init_srv $DEST; then
     justdoit cleanup_srv
     exit $allret
 else
-    syslogue "error" "Pas de sauvegarde pour $NAME cette fois :-("
-    exit 2
+    if [ $CANSKIP -eq 0 ]; then
+        syslogue "error" "Pas de sauvegarde pour $NAME cette fois :-("
+        exit 2
+    fi
 fi

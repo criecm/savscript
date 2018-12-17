@@ -185,8 +185,13 @@ if [ \"\$(uname -s)\" = \"FreeBSD\" -a \${SYSVER%%.*} -gt 6 ]; then
 fi" > $srvinfos 2> $TRACES/$NAME.init_srv
         . $srvinfos >> $TRACES/$NAME.init_srv 2>&1
     else
-        syslogue "crit" "Serveur $DEST down. Pas de sauvegarde"
-        return 1
+        if [ ${CANSKIP:-0} -eq 0 ]; then
+            syslogue "crit" "Serveur $DEST down. Pas de sauvegarde"
+            return 1
+        else
+            syslogue "info" "Serveur $DEST down. Pas de sauvegarde (CANSKIP)"
+            return 1
+        fi
     fi
     ### on a les infos du serveur: on les digere
     if [ "$SYSTEM" = "FreeBSD" ]; then
