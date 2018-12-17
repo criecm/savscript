@@ -16,7 +16,6 @@ PATH=/sbin:/bin:/usr/sbin:/usr/bin
 # VARIABLES that change things: (no options for those ones)
 # - CHANGEDSTHOST <oldname> : will use oldname to search snapshots
 #   (and clean them)
-# - SSH_CIPHERS : list of preferred ssh ciphers (ssh -c)
 ##################
 # default config #
 ##################
@@ -26,7 +25,6 @@ RECVOPT=${RECVOPT:-""}
 JUSTFORFUN=${JUSTFORFUN:-""}
 MYNAME=${MYNAME:-$(hostname -s)}
 VERBOSE=${VERBOSE:-0}
-SSH_CIPHERS=${SSH_CIPHERS:-"arcfour128,arcfour256,arcfour,blowfish-cbc,aes128-cbc,aes128-ctr,cast128-cbc"}
 
 SRCZFSLIST=${TMPDIR:-/var/tmp}/srczfslist.$$
 DSTZFSLIST=${TMPDIR:-/var/tmp}/dstzfslist.$$
@@ -576,7 +574,7 @@ SYSLOG_ID=${SYSLOG_ID:-user}
 ####################
 ### process args ###
 ####################
-SSHOPTS="-T"${SSHKEY:+" -i $SSHKEY"}${TEMPSSH:+" -oUserKnownHostsFile=${TMPDIR:-/tmp}/kkk -oCheckHostIP=no"}${SSH_CIPHERS:+" -c $SSH_CIPHERS"}
+SSHOPTS="-T"${SSHKEY:+" -i $SSHKEY"}${TEMPSSH:+" -oUserKnownHostsFile=${TMPDIR:-/tmp}/kkk -oCheckHostIP=no"}
 
 # determine source and dest hosts, volumes,...
 SRCHOST=""
