@@ -12,6 +12,8 @@ savpath=$(realpath "$(dirname $0)/..")
 
 prepend=",no-agent-forwarding,no-port-forwarding,no-X11-forwarding,no-user-rc,no-pty"
 
+SAVJAILS="NO"
+
 if ! ssh -oPasswordAuthentication=no -oIdentitiesOnly=yes -oIdentityFile=$SSH_KEY -oKbdInteractiveDevices=none root@$1 "echo connexion ssh ok"; then
   echo "pousse la cle sur ${1}:"
   echo "from=\""$(ssh $1 "echo \$SSH_CONNECTION"| awk '{print $1}')"\"$prepend $(cat $SSH_KEY.pub)" > /tmp/k
@@ -30,7 +32,7 @@ case "$SYSTEM" in
 "FreeBSD")
     EXCLUDES=""
     FSTYPES="ufs,zfs,ext3,ext2"
-    JAILS=`jls | tail -n +2`
+    JAILS=`iocage list`
     FSLIST="`df -t'$FSTYPES' | tail -n +2 | awk '\''{print $6}'\''`"
 ;;
 "OpenBSD")
@@ -50,6 +52,7 @@ echo FSLIST=\"$FSLIST\"
 echo MYNAME="`hostname -s`"')
 
 echo SYSTEM=$SYSTEM
+[ -n "$JAILS" ] && SAVJAILS="YES"
 echo EXCLUDES="$EXCLUDES"
 echo RSYNC=$RSYNC
 MYFQDN=$(getent hosts $MYIP | awk '{print $2}')
@@ -61,7 +64,7 @@ if [ -z "$MYNAME" -o -z "$MYIP" -o -z "$MYFQDN" -o -z "$RSYNC" -o -z "$SYSTEM" ]
   exit 1
 fi
 
-sed -E 's/%%NAME%%/'$MYNAME'/; s/%%FQDN%%/'$MYFQDN'/; s@%%EXCLUDES%%@'"$EXCLUDES"'@;' $savpath/machines.d/conf.template > /tmp/$MYNAME.conf
+sed -E 's/%%NAME%%/'$MYNAME'/; s/%%FQDN%%/'$MYFQDN'/; s@%%EXCLUDES%%@'"$EXCLUDES"'@; s@%%SAVJAILS%%@'$SAVJAILS'@;' $savpath/machines.d/conf.template > /tmp/$MYNAME.conf
 
 echo La conf generee:
 echo -- "##############################################################################"
@@ -73,9 +76,10 @@ if [ -f $savpath/machines.d/$MYNAME.conf ]; then
   exit 1
 fi
 
-ssh -i $SSH_KEY -x -a root@$MYFQDN "echo ok" || echo "La conf /tmp/$MYNAME.conf n'est pas fonctionnelle"
-
 echo "On l'installe ? (ENTREE ou CTRL+C)"
 read p
+
+ssh -i $SSH_KEY -x -a root@$MYFQDN "echo ok" || echo "La conf /tmp/$MYNAME.conf n'est pas fonctionnelle"
+
 mv /tmp/$MYNAME.conf $savpath/machines.d/$MYNAME.conf
 
