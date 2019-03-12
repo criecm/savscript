@@ -92,8 +92,9 @@ if init_srv $DEST; then
         fi
 	# corrige une racine ZFS freebsd (zroot/ROOT/default => /)
 	if [ -n "$ZFSSLASH" ]; then
-            [ "$(zfs list -H -o mountpoint $ZFSDEST)" = "none" ] || zfs set mountpoint=none $ZFSDEST
-	    if zfs list -H -o mountpoint $ZFSDEST/${ZFSSLASH#*/} | grep -q /$; then
+            [ "$(zfs get -H -o value mountpoint $ZFSDEST)" = "none" ] || zfs set mountpoint=none $ZFSDEST
+
+	    if [ "$(zfs get -H -o value mountpoint $ZFSDEST/${ZFSSLASH#*/})" != "$DESTDIR" ]; then
                 zfs set mountpoint=$DESTDIR $ZFSDEST/${ZFSSLASH#*/}
             fi
         fi
