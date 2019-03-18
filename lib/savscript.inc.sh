@@ -168,7 +168,7 @@ echo \"SYSTEM=\$SYSTEM\";
 echo \"SYSVER=\$SYSVER\";
 echo \"FSLIST=\\\"\$(mount -t $FSTYPES | sed \$SEDOPT 's@^.*on (/[^ ]*) (\(|type )([a-zA-Z0-9]+).*\$@\3:\1@' | sort -t: -k2)\\\"\";
 if [ \"\$(uname -s)\" = \"FreeBSD\" -a \${SYSVER%%.*} -gt 6 ]; then
-  echo JAILS=\\\"\$(/usr/sbin/jls | awk '(\$1 ~ /^[0-9]+\$/) { printf(\"%s\\\n\",\$4); }')\\\";
+  echo JAILS=\\\"\$(/usr/sbin/jls | awk '(\$1 ~ /^[0-9]+\$/) { printf(\"%s\\\n\",\$NF); }')\\\";
   if [ -x /usr/local/bin/ezjail-admin ]; then
     echo INACTIVEJAILS=\\\"\$(cd /usr/local/etc/ezjail; ls | fgrep norun | xargs -L1 awk 'BEGIN { FS=\"\\\"\" } (\$1 ~ /rootdir/) { print \$2 }')\\\";
   fi
