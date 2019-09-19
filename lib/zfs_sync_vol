@@ -342,7 +342,7 @@ get_last_common_snapshot() {
         if ! dst_zfs_list | cut -d'!' -f1 | grep -q '^'$dstfs'@'${snapcandidate}'$'; then
           if is_excluded ${SRCVOL}${dstfs#$DSTVOL}; then
             warne "excluded fs existing on dest: $dstfs : should delete it ?"
-            dst_cmd "zfs destroy -r $dstfs"
+            dst_run "zfs destroy -r $dstfs"
             rm $DSTZFSLIST
           elif src_zfs_list | cut -d'!' -f1 | sed 's|'${SRCVOL}'|'${DSTVOL}'|' | grep -q '^'$dstfs; then
             # this volume is part of $SRCVOL :(
