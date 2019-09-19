@@ -324,7 +324,7 @@ get_last_common_snapshot() {
   if [ ! -z "$LASTCOMMONSNAP" ]; then
     return 0
   fi
-  # s'il est stocke dans le ZFS distant, on fait confiance
+  # if stored in source property, try this one first
   test1=$(src_zfs_list | grep -E '^'${SRCVOL}'!.*![a-zA-Z0-9]+[-a-zA-Z0-9]+' | cut -d'!' -f3)
   if [ ! -z "$test1" ]; then
     dst_zfs_list | grep -Eq '^'${DSTVOL}'@'${test1}'!' && lastknownsnap=${test1}
@@ -342,7 +342,7 @@ get_last_common_snapshot() {
         if ! dst_zfs_list | cut -d'!' -f1 | grep -q '^'$dstfs'@'${snapcandidate}'$'; then
           if is_excluded ${SRCVOL}${dstfs#$DSTVOL}; then
             warne "excluded fs existing on dest: $dstfs : should delete it ?"
-#            dst_cmd "zfs destroy -r $dstfs"
+            dst_cmd "zfs destroy -r $dstfs"
             rm $DSTZFSLIST
           elif src_zfs_list | cut -d'!' -f1 | sed 's|'${SRCVOL}'|'${DSTVOL}'|' | grep -q '^'$dstfs; then
             # this volume is part of $SRCVOL :(
@@ -415,11 +415,14 @@ correct_mountpoints() {
 #
 # do the work
 sync_zfs() {
-  debug "sync_zfs $1 $2 $3 SRCVOL=$SRCVOL DSTVOL=$DSTVOL"
+  debug "sync_zfs $1 $2 $3 (SRCVOL=$SRCVOL DSTVOL=$DSTVOL RECURSE=$3)"
   local SRCV=${1}
-  local DSTV=${2%@*}
+  shift
+  local DSTV=${1%@*}
+  shift
   local RET=0
-  if [ $# -eq 3 -a "$3" = "NR" ]; then
+  if [ $# -eq 1 -a "$1" = "NR" ]; then
+    shift
     LRECURSE=""
     debug "sync_zfs: create_zfsdest $DSTV $SRCV"
     create_zfsdest ${DSTV} ${SRCV}
@@ -431,6 +434,8 @@ sync_zfs() {
   local RECVOPT=$RECVOPT
   if [ "$LRECURSE" != "YES_RECURSE" ]; then
     SENDOPT="-p"
+  else
+    SENDOPT="-R"
   fi
   local SRC_SEND_CMD="zfs send ${SENDOPT:+${SENDOPT}} ${LASTCOMMONSNAP:+$INCOPT $LASTCOMMONSNAP} ${SRCV}@${NEWSNAP}"
   local DST_RECV_CMD="zfs receive -v ${RECVOPT:+${RECVOPT}} ${NODSTMOUNT:+ -u} ${DSTV}"
@@ -464,7 +469,7 @@ sync_zfs() {
 create_zfsdest() {
   local DSTV=${1:-$DSTVOL}
   local SRCV=${2:-$SRCVOL}
-  local MNTPOINT=$(get_mountpoint $DSTV)
+  local MNTPOINT=${3:-$(get_mountpoint $DSTV)}
   dst_zfs_list | grep -q '^'${DSTV}'!' && return 0
   cmd="zfs create"$(src_ro_run "zfs get -H -oproperty,value,source all ${SRCV}" | grep 'local$' | while read prop val source; do
      if [ "$prop" = "mountpoint" ]; then
@@ -491,7 +496,7 @@ get_mountpoint() {
   [ -z "$DSTMOUNTBASE" -o "$DSTMOUNTBASE" = "none" -o "$DSTMOUNTBASE" = "legacy" ] && \
     DSTMOUNTBASE=$(dst_ro_run "zfs list -H -o mountpoint $DSTVOL 2>/dev/null")
   [ -z "$DSTMOUNTBASE" -o "$DSTMOUNTBASE" = "none" -o "$DSTMOUNTBASE" = "legacy" -o "$MOUNTBASE" = "-" ] && \
-    DSTMOUNTBASE=$(dst_ro_run "zfs list -H -o mountpoint ${DSTVOL%/*}")/${DSTVOL##*/}
+    DSTMOUNTBASE=$(dst_ro_run "zfs list -H -o mountpoint ${DSTVOL%/*}")/${DSTVOL#*/}
 
   [ -z "$DSTMOUNTBASE" -o "$DSTMOUNTBASE" = "none" -o "$DSTMOUNTBASE" = "legacy" ] && \
     erreur 5 "Impossible de determiner le repertoire de montage"
@@ -506,25 +511,26 @@ get_mountpoint() {
 get_zfses() {
 debug get_zfses $*
   local ERRS=0
-  SUBVOL=$(echo ${1} | sed 's!'${SRCVOL}'!!; s/@.*$//;')
+  local LOOPSRCVOL=${1%@*}
+  local SUBVOL=$(echo ${1} | sed 's!'${SRCVOL}'!!; s/@.*$//;')
   local LOOPDSTVOL=${2:-${DSTVOL}${SUBVOL}}
   local DSTMNTPOINT=${3:-$(get_mountpoint ${LOOPDSTVOL})}
-  if has_excludes ${SRCVOL}${SUBVOL} > /dev/null; then
-debug "get_zfses($1): $SRCVOL has excludes"
-    if ! is_excluded ${SRCVOL}${SUBVOL}; then
-      DSTMNTPOINT=$(get_mountpoint ${DSTVOL}${SUBVOL})
-      sync_zfs ${SRCVOL}${SUBVOL} $LOOPDSTVOL NR || ERRS=$((ERRS + 1))
+  if has_excludes ${LOOPSRCVOL} > /dev/null; then
+    debug "get_zfses($1): $LOOPSRCVOL has excludes"
+    if ! is_excluded ${LOOPSRCVOL}; then
+      DSTMNTPOINT=$(get_mountpoint ${LOOPDSTVOL})
+      sync_zfs ${LOOPSRCVOL} ${LOOPDSTVOL} NR || return 1
     fi
     local fs
-    for fs in $(src_zfs_list | cut -d'!' -f1 | grep '^'${1}'/[^@/]*$'); do
-      if ! is_excluded ${fs}; then
-        get_zfses ${fs} $LOOPDSTVOL || ERRS=$((ERRS + 1))
+    for fs in $(src_zfs_list | cut -d'!' -f1 | grep '^'${LOOPSRCVOL}'/[^@/]*$' | sed 's*'$LOOPSRCVOL'**'); do
+      if ! is_excluded ${LOOPSRCVOL}${fs}; then
+        get_zfses ${LOOPSRCVOL}${fs} ${LOOPDSTVOL}${fs} || ERRS=$((ERRS + $?))
       fi
     done
   else
-debug "get_zfses($1): $SRCVOL has NO excludes"
-    DSTMNTPOINT=$(get_mountpoint ${DSTVOL})
-    sync_zfs ${SRCVOL}${SUBVOL} $LOOPDSTVOL || ERRS=$((ERRS + 1))
+    debug "get_zfses($1): $LOOPSRCVOL has NO excludes"
+    DSTMNTPOINT=$(get_mountpoint ${LOOPDSTVOL})
+    sync_zfs ${LOOPSRCVOL} ${LOOPDSTVOL} || ERRS=$((ERRS + 1))
   fi
   return $ERRS
 }

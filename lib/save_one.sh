@@ -114,7 +114,7 @@ if init_srv $DEST; then
             mount | grep '^'$ZFSDEST'.* on '$DESTDIR | awk '{print $1}' | sort -r | xargs -L1 umount -f || mount -tzfs | grep '^'$ZFSDEST'.* on '$DESTDIR
             mount -tzfs $ZFSDEST/${ZFSSLASH#*/} $DESTDIR
             zfs list -H -o canmount,mountpoint,name -r $ZFSDEST | awk '($1 ~ /^on$/ && $2 !~ /^(legacy|none)$/ && $2 ~ /'$(echo $DESTDIR|sed 's@/@\\/@g')'/) { print $3 }' | while read z; do
-                mount | grep "^$z " || zfs mount $z
+                mount | grep -q "^$z " || zfs mount $z
             done
         fi
 

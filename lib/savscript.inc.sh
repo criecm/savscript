@@ -231,7 +231,7 @@ fi" > $srvinfos 2> $TRACES/$NAME.init_srv
                 else
                 # ... ou si un seul non-exclu
                     npools=0
-		    pools=""
+                    pools=""
                     for pool in $ZPOOLS; do
                         if ! is_excluded $pool; then
                             npools=$(( $npools+1 ))
@@ -241,7 +241,7 @@ fi" > $srvinfos 2> $TRACES/$NAME.init_srv
                     if [ $npools -eq 1 ]; then
                         # on oublie simplement les autres pools s'ils sont exclus
                         ONEZPOOL=${pools# }
-			ZPOOLS=${pools# }
+                        ZPOOLS=${pools# }
                     fi
                 fi
                 echo "ONEZPOOL=$ONEZPOOL" >> $srvinfos
@@ -294,9 +294,9 @@ port = $RSYNC_PORT
 pid file = \$RSYNC_SRV_DIR/rsyncd.pid
 log file = \$RSYNC_SRV_DIR/rsyncd.log
 [root]
-	path = /
-	hosts allow = \${SSH_CLIENT%% *}
-	read only = true
+    path = /
+    hosts allow = \${SSH_CLIENT%% *}
+    read only = true
 EOF
   if rsync --daemon --config=\$RSYNC_SRV_DIR/rsyncd.conf < /dev/null; then
     sleep 1;
@@ -368,10 +368,13 @@ get_destdir_for() {
 # determine la destination ZFS
 get_zfsdest_for() {
     is_zfs_path $1 && test=$(get_srcdir_for_zfs $1) || test=$1
+    syslogue "debug" "get_zfsdest_for($1) => $test)"
     if is_jailed $test; then
         echo $JAILSZFSDEST/$curjail${test#$curjaildir}
+        syslogue "debug" "get_zfsdest_for($1) => $JAILSZFSDEST/$curjail${test#$curjaildir}"
     else
         echo $ZFSDEST${test%*/}
+        syslogue "debug" "get_zfsdest_for($1) => $ZFSDEST/${test%*/}"
     fi
 }
 
@@ -381,9 +384,9 @@ get_zfs_src_for() {
         if [ "$1" = "${zfsdesc%|*}" ]; then
             echo "${zfsdesc#*|}"
             return
-	elif [ "$1" = "${zfsdesc#*|}" ]; then
-	    echo "${zfsdesc#*|}"
-	    return
+        elif [ "$1" = "${zfsdesc#*|}" ]; then
+            echo "${zfsdesc#*|}"
+            return
         fi
     done
     return 1
@@ -421,7 +424,7 @@ init_zfs_dest() {
         # on cree les elements intermediaires sans montage
         # (l'ordre *doit* etre du plus court au plus long)
         myzpath=$myzfsdest
-	ztocreate=""
+        ztocreate=""
         while ! zfs list -H -o name ${myzpath%/*}; do
             ztocreate=${myzpath%/*}" "$ztocreate
             myzpath=${myzpath%/*}
@@ -525,7 +528,23 @@ get_zfs() {
     ztarget=$1
     d=${2:-$(get_zfsdest_for $ztarget)}
     if [ ! -z "$d" ]; then
-        [ -n "$(zfs list -H -oname ${d%/*})" ] || zfs create -o canmount=off ${d%/*}
+        if ! [ -n "$(zfs list -H -oname ${d%/*})" ]; then
+            if ! zfs create -o canmount=off ${d%/*} 2>/dev/null; then
+                    syslogue "info" "get_zfs(${1}): unable to create ${d%/*}"
+                    return 1
+            fi
+        fi
+        # we may transfer a whole zpool with ROOT/default / ?
+        if [ "$ztarget" = "/" ] && echo "$d" | fgrep -q "/ROOT/[^/]"; then
+            syslogue "debug" "ROOT/* / zfs"
+            d=$ZFSDEST
+            if ! zfs list -H -oname ${d} > /dev/null 2>&1; then
+                if ! zfs create -o canmount=off ${d}; then
+                    syslogue "info" "get_zfs(${1}): unable to create ${d%/*}"
+                    return 1
+                fi
+            fi
+        fi
     fi
     s=${3:-$(get_zfs_src_for $ztarget)}
     dm=$(get_destdir_for $ztarget)
@@ -650,7 +669,7 @@ get_jail() {
     local cret=0
     if is_iojail $jaildir; then
 debug "iocage curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
-	      get_zfs ${curjaildir} $JAILSZFSDEST/$curjail ${curjailsrc}
+        get_zfs ${curjaildir} $JAILSZFSDEST/$curjail ${curjailsrc}
         ret=$?
         now_exclude ${curjaildir}
         now_exclude_zfs ${curjailsrc}
