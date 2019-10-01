@@ -329,7 +329,7 @@ get_last_common_snapshot() {
   if [ ! -z "$test1" ]; then
     dst_zfs_list | grep -Eq '^'${DSTVOL}'@'${test1}'!' && lastknownsnap=${test1}
   fi
-  if [ ! -z $RELAXSNAPREGEX ]; then
+  if [ "$RELAXSNAPREGEX" = "YES_RELAXSNAPREGEX" ]; then
     SNAPCANDIDATES=$(dst_zfs_list | cut -d'!' -f1 | grep -E '^'${DSTVOL}'@.*$')
   else
     SNAPCANDIDATES=$(dst_zfs_list | cut -d'!' -f1 | grep -E '^'${DSTVOL}'@'${SRCSNAPHOST:-$MYNAME}'-'${DSTSEARCHHOST:-$MYNAME}'-[[:digit:]]{8}-[[:digit:]]{2}h[[:digit:]]{2}m[[:digit:]]{2}s$')
