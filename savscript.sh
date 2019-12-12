@@ -58,7 +58,7 @@ ADMINMAIL=${ADMINMAIL:-"dgeo@ec-m.fr"}
 # repertoire de base pour le stockage temporaire des resultats
 TRACESDIRBASE=${TRACESDIRBASE:-"${TMPDIR:-/tmp}/LOG.SAUV_TRACES"}
 # max n. of concurrent jobs
-MAXJOBS=${MAXJOBS:-10}
+MAXJOBS=${MAXJOBS:-$(sysctl -n hw.ncpu)}
 # syslog facility
 export SYSLOG_FACILITY=${SYSLOG_FACILITY:-"user"}
 # syslog 'program'
