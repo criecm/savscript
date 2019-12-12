@@ -25,6 +25,7 @@ RECVOPT=${RECVOPT:-""}
 JUSTFORFUN=${JUSTFORFUN:-""}
 MYNAME=${MYNAME:-$(hostname -s)}
 VERBOSE=${VERBOSE:-0}
+SSH_CIPHERS=${SSH_CIPHERS:-""}
 
 SRCZFSLIST=${TMPDIR:-/var/tmp}/srczfslist.$$
 DSTZFSLIST=${TMPDIR:-/var/tmp}/dstzfslist.$$
@@ -257,7 +258,7 @@ src_ro_run() {
 src_zfs_list() {
   if [ ! -s "$SRCZFSLIST" ]; then
     # WARNING: there are TABs in next line !
-    src_ro_run "zfs list -H -t all -oname,mountpoint,lastbackup:${DSTSNAPHOST:-$MYNAME},origin -S creation ${LIMIT_RECURSION:+-d1} -r $SRCVOL" | sed 's/	/\!/g' > $SRCZFSLIST
+    src_ro_run "zfs list -H -t all -oname,mountpoint,lastbackup:${DSTSNAPHOST:-$MYNAME},origin,jailed -S creation ${LIMIT_RECURSION:+-d1} -r $SRCVOL" | grep -v 'on$' | sed 's/	/\!/g' > $SRCZFSLIST
     src_ro_run "zfs get ${GRECURSE:+-r} -Hp -t filesystem -oname,value,source mountpoint $SRCVOL" | sed 's/	/\!/g' > $SRCZFSLIST.mounts
   fi
   cat $SRCZFSLIST
@@ -267,7 +268,7 @@ dst_zfs_list() {
   if [ ! -s "$DSTZFSLIST" ]; then
     # WARNING: there are TABs in next line !
     #$dstrocmd "zfs list -H -t filesystem,volume -oname,mountpoint,orig:mountpoint -S creation ${GRECURSE:+-r} $DSTVOL 2>/dev/null | sed 's/	/\!/g'; zfs list -H -t snapshot -oname,mountpoint,orig:mountpoint -S creation ${LIMIT_RECURSION:+-d1} -r $DSTVOL 2>/dev/null | sed 's/	/\!/g'" > $DSTZFSLIST
-    dst_ro_run "zfs list -H -t filesystem,volume -oname,mountpoint,orig:mountpoint -S creation ${GRECURSE:+-r} $DSTVOL 2>/dev/null; zfs list -H -t snapshot -oname,mountpoint,orig:mountpoint -S creation ${LIMIT_RECURSION:+-d1} -r $DSTVOL 2>/dev/null" | sed 's/	/\!/g' > $DSTZFSLIST
+    dst_ro_run "zfs list -H -t filesystem,volume -oname,mountpoint,orig:mountpoint,jailed -S creation ${GRECURSE:+-r} $DSTVOL 2>/dev/null; zfs list -H -t snapshot -oname,mountpoint,orig:mountpoint -S creation ${LIMIT_RECURSION:+-d1} -r $DSTVOL 2>/dev/null" | sed 's/	/\!/g' > $DSTZFSLIST
   fi
   cat $DSTZFSLIST
 }
@@ -692,7 +693,7 @@ echo $DSTMOUNTBASE | grep -q '^/[a-zA-Z0-9]' || echo $DSTMOUNTBASE | grep '\(non
 
 # check for dangerous new fixed mountpoints on source for new volumes
 for fs in $(grep '!\(local\|received\)$' $SRCZFSLIST.mounts | cut -d'!' -f1 | sed 's|'${SRCVOL}'|'${DSTVOL}'|'); do
-  dst_zfs_list | grep '^'$fs'!' | cut -d'!' -f2 | while read dstmountpoint; do
+  dst_zfs_list | grep '^'$fs'!' | grep -v 'on$' | cut -d'!' -f2 | while read dstmountpoint; do
     if ! expr "$dstmountpoint" : "$DSTMOUNTBASE" > /dev/null && [ -z "$CORRECTMOUNTS" -a -z "$DSTREMOUNTORIG" ]; then
       erreur "DANGEROUS: some mountpoints out of $DSTMOUNTBASE (and no -U !)"
     fi
@@ -700,7 +701,7 @@ for fs in $(grep '!\(local\|received\)$' $SRCZFSLIST.mounts | cut -d'!' -f1 | se
 done
 
 # check for dangerous mountpoints on dest
-if [ -n "$(dst_zfs_list | grep -Ev '^'${DSTVOL}'.*!(none|legacy|-)!' | grep -qv '!'${DSTMOUNTBASE}'!')" ]; then
+if [ -n "$(dst_zfs_list | grep -Ev '^'${DSTVOL}'.*!(none|legacy|-)!' | grep -qv '!'${DSTMOUNTBASE}'!' | grep -v '!on$')" ]; then
   if [ -z "$CORRECTMOUNTS" -a -z "$DSTREMOUNTORIG" ]; then
     erreur "WARNING: certains points de montage sont hors de $DSTMOUNTBASE (et -U absent) : $(dst_zfs_list | grep -Ev '^'${DSTVOL}'.*!(none|legacy|-)!' | grep -v '!'${DSTMOUNTBASE} | sed 's/^\(.*\)!\(.*\)!.*$/\1 -> \2/')"
   fi
