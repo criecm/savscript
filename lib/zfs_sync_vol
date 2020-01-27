@@ -277,12 +277,12 @@ dst_zfs_list() {
 has_excludes() {
   test -s "$EXCLUDEFILE" || return 1
   # excludes as zfs path
-  grep '^'$1'/.*' $EXCLUDEFILE && r=0
+  grep '^'$1'/.*' $EXCLUDEFILE && return 0
   # excludes as unix path
   for efs in $(src_zfs_list | grep '^'$1'[^@]*!' | cut -d'!' -f2 | sort); do
-    grep "^$efs$" $EXCLUDEFILE && r=0
+    grep "^$efs$" $EXCLUDEFILE && return 0
   done
-  return ${r:-1}
+  return 1
 }
 
 is_excluded() {
@@ -349,7 +349,7 @@ get_last_common_snapshot() {
             # this volume is part of $SRCVOL :(
             warne "snapshot ${snapcandidate} missing on $dstfs"
             #snapcandidate=""
-            break
+            break 1
           fi
         fi
       done
@@ -363,7 +363,7 @@ get_last_common_snapshot() {
           if dst_zfs_list | cut -d'!' -f1 | grep -q '^'${DSTVOL}${fs#${SRCVOL}}'!'; then
             debug "$snapcandidate non valide (manque sur ${DSTVOL}${fs#${SRCVOL}})"
             snapcandidate=""
-            break
+            break 1
           fi
         fi
       done
