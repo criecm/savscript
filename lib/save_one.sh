@@ -64,7 +64,9 @@ if init_srv $DEST; then
             done
         fi
     fi
-
+    if [ ! -z "$IORIGIN" ]; then
+        now_exclude_zfs ${IORIGIN%%/releases*}/releases
+    fi
     # FULL ZFS SCENARIO
     if [ "$FULLZFS" = "YES" ]; then
         # tout est en ZFS: cool :)
