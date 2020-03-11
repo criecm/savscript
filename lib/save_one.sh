@@ -66,6 +66,7 @@ if init_srv $DEST; then
     fi
     if [ ! -z "$IORIGIN" ]; then
         now_exclude_zfs ${IORIGIN%%/releases*}/releases
+        now_exclude_zfs ${IORIGIN%%/releases*}/download
     fi
     # FULL ZFS SCENARIO
     if [ "$FULLZFS" = "YES" ]; then
