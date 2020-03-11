@@ -691,8 +691,8 @@ if [ -z "$DSTMOUNTBASE" -o "$DSTMOUNTBASE" = "none" -o "$DSTMOUNTBASE" = "legacy
   fi
 fi
 
-# DSTMOUNTBASE MUST exist now...
-echo $DSTMOUNTBASE | grep -q '^/[a-zA-Z0-9]' || echo $DSTMOUNTBASE | grep '\(none\|legacy\)' || erreur "DSTMOUNTBASE mal defini ($DSTMOUNTBASE)"
+# check DSTMOUNTBASE must exist
+echo $DSTMOUNTBASE | grep -q '^/[a-zA-Z0-9]' || echo $DSTMOUNTBASE | grep -q '\(none\|legacy\)' || erreur "DSTMOUNTBASE mal defini ($DSTMOUNTBASE)"
 
 # check for dangerous new fixed mountpoints on source for new volumes
 for fs in $(grep '!\(local\|received\)$' $SRCZFSLIST.mounts | cut -d'!' -f1 | sed 's|'${SRCVOL}'|'${DSTVOL}'|'); do
@@ -786,7 +786,7 @@ fi
 if [ $RET -eq 0 ]; then
   src_run "zfs set lastbackup:${DSTSNAPHOST:-$MYNAME}=${NEWSNAP} ${SRCVOL}"
 fi
-#TMP#rm -f $SRCZFSLIST $SRCZFSLIST.mounts $DSTZFSLIST
+rm -f $SRCZFSLIST $SRCZFSLIST.mounts $DSTZFSLIST
 
 TCLEANUPOK=$(date +%s)
 TCLEANUP=$(($TCLEANUPOK - $TPOSTCHECKSOK))
