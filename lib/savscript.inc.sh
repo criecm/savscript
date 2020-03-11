@@ -11,8 +11,8 @@
 excludefrom=$TRACES/$NAME.excludes
 ZEXCLUDES="-x $excludefrom.zfs"
 #ZOPTS="-k $SSH_KEY -C -m 'GMT-%Y.%m.%d-%H.%M.%S' -I"
-ZOPTS="-k $SSH_KEY -CUIu"
-ZRECURSION="-R"
+ZOPTS="-k $SSH_KEY -CUu"
+ZRECURSION="-r"
 
 if [ $DEBUG -ge 4 ]; then
     ZOPTS=$ZOPTS" -vv"
