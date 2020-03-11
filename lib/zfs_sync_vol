@@ -36,7 +36,8 @@ usage() {
   echo "         [-b <snapshot>] [-s] [-S] <SRCVOL>[@host] <DSTVOL>[@host]"
   echo "      -k ssh_key: use this ssk private key for remote commands - MANDATORY if opearating remotly"
   echo "      -R: use 'zfs send -R' and snapshot -r ('full replication stream', **see zfs(1M) !**)"
-  echo "      -x <file>: exclude zfs volumes matching <file> (with -R)"
+  echo "      -r: recurse"
+  echo "      -x <file>: exclude zfs volumes matching <file> (with -R or -r)"
   echo "      -B: Rollback to last common snapshot (zfs receive -F)"
   echo "      -u: do not mount received volume(s) on destination (usefull for 'full replication stream' backups !)"
   echo "      -U: safe mountpoints (backed up to orig:mountpoint if outside of destination"
@@ -85,7 +86,7 @@ shortusage() {
 }
 
 ORIGARGS=$@
-while getopts IRk:t:sSo:O:H:hCc:nuUzTb:ax:Bm:l:jv option
+while getopts IRrk:t:sSo:O:H:hCc:nuUzTb:ax:Bm:l:jv option
 do
   case $option in
     I)
@@ -93,8 +94,11 @@ do
     ;;
     R)
       SENDOPT="-R"
-      GRECURSE="YES_RECURSE"
+      GRECURSE="FULL"
 #      DOROLLBACK="LOOSELY"
+    ;;
+    r)
+      GRECURSE="MANUAL"
     ;;
     B)
       RECVOPT='-F'
@@ -304,7 +308,7 @@ make_source_snapshot() {
   if has_excludes ${1%@*} > /dev/null; then
     for fs in $(src_zfs_list | cut -d'!' -f1 | grep '^'${1%@*}'/[^@]*$'); do
       if is_excluded $fs; then
-        if [ "$GRECURSE" != "YES_RECURSE" ] || ! echo $DELSNAPS | grep -q ' '$fs' '; then
+        if [ -z "$GRECURSE" ] || ! echo $DELSNAPS | grep -q ' '$fs' '; then
           DELSNAPS=$DELSNAPS"${fs}@${1#*@} "
         fi
       else
@@ -316,7 +320,6 @@ make_source_snapshot() {
   fi
   src_run "zfs snapshot ${GRECURSE:+-r} $SRCVOL@${1#*@}; ${DELSNAPS:+for i in $DELSNAPS; do zfs destroy -r \$i; done}"
   rm $SRCZFSLIST
-  src_zfs_list > /dev/null
 }
 
 # args: srcvol dstvol
@@ -433,7 +436,7 @@ sync_zfs() {
 
   local SENDOPT=$SENDOPT
   local RECVOPT=$RECVOPT
-  if [ "$LRECURSE" != "YES_RECURSE" ]; then
+  if [ "$LRECURSE" != "FULL" ]; then
     SENDOPT="-p"
   else
     SENDOPT="-R"
@@ -516,8 +519,8 @@ debug get_zfses $*
   local SUBVOL=$(echo ${1} | sed 's!'${SRCVOL}'!!; s/@.*$//;')
   local LOOPDSTVOL=${2:-${DSTVOL}${SUBVOL}}
   local DSTMNTPOINT=${3:-$(get_mountpoint ${LOOPDSTVOL})}
-  if has_excludes ${LOOPSRCVOL} > /dev/null; then
-    debug "get_zfses($1): $LOOPSRCVOL has excludes"
+  if has_excludes ${LOOPSRCVOL} > /dev/null || [ "$GRECURSE" = "MANUAL" ]; then
+    debug "get_zfses($1): $LOOPSRCVOL has excludes or manual recursion required"
     if ! is_excluded ${LOOPSRCVOL}; then
       DSTMNTPOINT=$(get_mountpoint ${LOOPDSTVOL})
       sync_zfs ${LOOPSRCVOL} ${LOOPDSTVOL} NR || return 1
@@ -549,8 +552,8 @@ if [ ! -z "$EXCLUDEFILE" ]; then
   if [ ! -f "$EXCLUDEFILE" ]; then
     erreur "$EXCLUDEFILE doesn't exist"
   fi
-  if [ "$GRECURSE" != "YES_RECURSE" ]; then
-    erreur "-x <file> only makes sense with -R"
+  if [ -z "$GRECURSE" ]; then
+    erreur "-x <file> only makes sense with -R or -r"
   fi
 fi
 if [ "$GRECURSE" != "YES_RECURSE" ]; then
