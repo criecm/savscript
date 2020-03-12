@@ -559,7 +559,7 @@ get_zfs() {
     shellex $ZFS_SYNC_VOL $ZRECURSION $ZEXCLUDES $ZOPTS ${s}@${DEST} ${d} >> $L 2>&1
     ret=$?
     if [ $ret -ne 0 ]; then
-        MYZOPTS=""
+        MYZOPTS="-j"
         descpb="inconnu"
         case $ret in
             7) # pb snapshots desynchro
@@ -574,14 +574,14 @@ get_zfs() {
             ;;
             *)
                 if grep -q "destination ${d}.* has been modified" $L; then
-                    MYZOPTS=$ZOPTS" -B"
+                    MYZOPTS=$ZOPTS" -Bj"
                     syslogue "warning" "get_zfs(${s}@${DEST}): Deuxieme tentative avec -B"
                     descpb="force rollback"
                 fi
             ;;
         esac
         if [ -n "$MYZOPTS" ]; then
-            shellex $ZFS_SYNC_VOL $ZRECURSION $ZEXCLUDES $MYZOPTS ${s}@${DEST} ${d} >> $L 2>&1
+            shellex $ZFS_SYNC_VOL $ZRECURSION $ZEXCLUDES $ZOPTS $MYZOPTS ${s}@${DEST} ${d} >> $L 2>&1
             ret=$?
         fi
         if [ $ret -eq 0 ]; then
