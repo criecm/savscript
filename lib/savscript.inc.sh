@@ -180,7 +180,7 @@ if [ \"\$(uname -s)\" = \"FreeBSD\" -a \${SYSVER%%.*} -gt 6 ]; then
   if [ \$(mount -t zfs | wc -l) -gt 0 ]; then
     echo ZPOOLS=\\\"\$(/sbin/zpool list -H -o name)\\\";
     echo ZFSSLASH=\\\"\$(zfs list -H -omountpoint,name / | awk '{print \$2}')\\\";
-    echo ZFSFSES=\\\"\$(zfs list -H -t filesystem -o mountpoint,name | sed \$SEDOPT 's/[[:space:]]+/|/')\\\";
+    echo ZFSFSES=\\\"\$(zfs list -H -t filesystem -o jailed,name,mountpoint | grep -v '^on.*none' | awk '/^on/{j=\$2;gsub(\"^.*jails/\",\"\",j);gsub(\"/.*\$\",\"\",j); printf(\"/iocage/jails/%s/root%s|%s\\\n\",j,\$3,\$2)}/^off/{printf(\"%s|%s\\\n\",\$3,\$2);}')\\\";
   fi
 fi" > $srvinfos 2> $TRACES/$NAME.init_srv
         . $srvinfos >> $TRACES/$NAME.init_srv 2>&1
