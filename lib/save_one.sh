@@ -52,9 +52,12 @@ if init_srv $DEST; then
         if [ ! -z "$JAILS" ]; then
             # get cloned origins
             if [ ! -z "$IORIGIN" ]; then
+                ZR="$ZRECURSION"
+                ZRECURSION="-R"
                 for o in $IORIGIN; do
                     get_zfs $(get_srcdir_for_zfs $o) $JAILSZFSDEST/${NAME}_${o##*/} $o
                 done
+                ZRECURSION="$ZR"
             fi
             for jaildir in $JAILS; do
                 if ! is_excluded $jaildir; then
