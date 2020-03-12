@@ -548,6 +548,10 @@ get_zfs() {
     fi
     s=${3:-$(get_zfs_src_for $ztarget)}
     dm=$(get_destdir_for $ztarget)
+    if is_excluded $s; then
+      debug "$s excluded"
+      return 0
+    fi
     L=$TRACES/$NAME.get_zfs.$(echo $1 | sed 's@/@_@g')
     syslogue "debug" "($NAME) get_zfs($@): src=$s dst=$d"
     if [ -z "$d" -o -z "$s" ]; then
