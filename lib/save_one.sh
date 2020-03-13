@@ -27,6 +27,8 @@ CANSKIP=${CANSKIP:-0}
 
 DEST=${DEST:-$NAME}
 
+echo -- $ZRECURSION | grep -q r && SNAP_AFTER=YES
+
 justdoit() {
   if [ ! -z "$JUSTSAYIT" ]; then
     echo "$@" >&2
@@ -164,6 +166,7 @@ if init_srv $DEST; then
           syslogue "notice" "($NAME) done with warnings :-/"
         fi
     fi
+    [ "$SNAP_AFTER" = "YES" ] && justdoit snapshot_dest $ZFSDEST
     justdoit cleanup_srv
     exit $allret
 else
