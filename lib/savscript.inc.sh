@@ -147,10 +147,10 @@ snapshot_dest() {
   V=$1
   SNAPNAME=${SNAPNAME:-$(TZ=GMT date +GMT-%Y.%m.%d-%H.%M.%S)}
   doit /sbin/zfs snapshot -r $V@$SNAPNAME
-  keep=100
+  keep=0
   for s in $(zfs list -H -o name -r -t snapshot -S creation -d1 $V | grep @GMT-); do
-    keep=$(( $keep - 1 ))
-    if [ $keep -lt 1 ]; then
+    keep=$(( $keep + 1 ))
+    if [ $keep -gt 150 ]; then
       syslogue "notice" "snapshot_dest($*): destroy $s ($keep)"
       zfs destroy -r $s
     fi
