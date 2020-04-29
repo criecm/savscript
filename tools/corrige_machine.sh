@@ -1,12 +1,13 @@
 #!/bin/sh
+
+savpath=$(realpath "$(dirname $0)/..")
+. $savpath/savscript.conf || exit 1
+
 if [ $# -ne 1 ] || ! zfs list -H $SAVZFSBASE/$1 > /dev/null; then
   echo usage: $0 machine
 fi
 m=$1
 me=$(hostname -s)
-
-savpath=$(realpath "$(dirname $0)/..")
-. $savpath/savscript.conf || exit 1
 
 :>/tmp/$m.pb
 for z in $(zfs list -r -H -o name $SAVZFSBASE/$m); do        
