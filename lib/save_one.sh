@@ -100,7 +100,9 @@ if init_srv $DEST; then
         fi
 	# corrige une racine ZFS freebsd (zroot/ROOT/default => /)
 	if [ -n "$ZFSSLASH" ]; then
-            [ "$(zfs get -H -o value mountpoint $ZFSDEST)" = "none" ] || zfs set mountpoint=none $ZFSDEST
+            if [ "$(zfs get -H -o value canmount $ZFSDEST)" = "on" ]; then
+              [ "$(zfs get -H -o value mountpoint $ZFSDEST)" = "none" ] || zfs set mountpoint=none $ZFSDEST
+            fi
 
 	    if [ "$(zfs get -H -o value mountpoint $ZFSDEST/${ZFSSLASH#*/})" != "$DESTDIR" ]; then
                 zfs set mountpoint=$DESTDIR $ZFSDEST/${ZFSSLASH#*/}
@@ -121,7 +123,7 @@ if init_srv $DEST; then
             zfs list -H -o canmount,mountpoint,name,mounted -S name -r $ZFSDEST | awk '($1 ~ /^on$/ && $2 !~ /^legacy$/ && $4 ~ /^yes$/) { print $3 }' | xargs -L1 zfs umount
             mount | grep '^'$ZFSDEST'.* on '$DESTDIR | awk '{print $1}' | sort -r | xargs -L1 umount -f || mount -tzfs | grep '^'$ZFSDEST'.* on '$DESTDIR
             mount -tzfs $ZFSDEST/${ZFSSLASH#*/} $DESTDIR
-            zfs list -H -o canmount,mountpoint,name -r $ZFSDEST | awk '($1 ~ /^on$/ && $2 !~ /^(legacy|none)$/ && $2 ~ /'$(echo $DESTDIR|sed 's@/@\\/@g')'/) { print $3 }' | while read z; do
+            zfs list -H -o canmount,jailed,mountpoint,name -r $ZFSDEST | awk '($1 ~ /^on$/ && $2 !~ /^on$/ && $3 !~ /^(legacy|none)$/ && $3 ~ /'$(echo $DESTDIR|sed 's@/@\\/@g')'/) { print $4 }' | while read z; do
                 mount | grep -q "^$z " || zfs mount $z
             done
         fi
