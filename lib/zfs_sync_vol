@@ -264,10 +264,11 @@ src_zfs_list() {
   if [ ! -s "$SRCZFSLIST" ]; then
     # WARNING: there are TABs in next line !
     #src_ro_run "zfs list -H -t all -oname,mountpoint,lastbackup:${DSTSNAPHOST:-$MYNAME},origin,jailed -S creation ${LIMIT_RECURSION:+-d1} -r $SRCVOL" | grep -v 'on$' | sed 's/	/\!/g' > $SRCZFSLIST
+    SYSTEM=$(src_ro_run uname -s)
     if [ "$SYSTEM" = "FreeBSD" ]; then
-      src_ro_run "zfs list -H -t all -oname,mountpoint,lastbackup:${DSTSNAPHOST:-$MYNAME},origin,jailed -S creation ${LIMIT_RECURSION:+-d1} -r $SRCVOL" | awk '/on$/{j=$1;gsub("^.*jails/","",j);gsub("/.*$","",j); gsub(".*","/iocage/jails/"j"/root"$2,$2);}{printf("%s\t%s\t%s\t%s\t%s\n",$1,$2,$3,$4,$5);}' | sed 's/	/\!/g' > $SRCZFSLIST
+      src_ro_run "zfs list -H -t filesystem,volume,snapshot -oname,mountpoint,lastbackup:${DSTSNAPHOST:-$MYNAME},origin,jailed -S creation ${LIMIT_RECURSION:+-d1} -r $SRCVOL" | awk '/on$/{j=$1;gsub("^.*jails/","",j);gsub("/.*$","",j); gsub(".*","/iocage/jails/"j"/root"$2,$2);}{printf("%s\t%s\t%s\t%s\t%s\n",$1,$2,$3,$4,$5);}' | sed 's/	/\!/g' > $SRCZFSLIST
     else
-      src_ro_run "zfs list -H -t all -oname,mountpoint,lastbackup:${DSTSNAPHOST:-$MYNAME},origin -S creation ${LIMIT_RECURSION:+-d1} -r $SRCVOL" | awk '{printf("%s\t%s\t%s\t%s\toff\n",$1,$2,$3,$4);}' | sed 's/	/\!/g' > $SRCZFSLIST
+      src_ro_run "zfs list -H -t filesystem,volume,snapshot -oname,mountpoint,lastbackup:${DSTSNAPHOST:-$MYNAME},origin -S creation ${LIMIT_RECURSION:+-d1} -r $SRCVOL" | awk '{printf("%s\t%s\t%s\t%s\toff\n",$1,$2,$3,$4);}' | sed 's/	/\!/g' > $SRCZFSLIST
     fi
     src_ro_run "zfs get ${GRECURSE:+-r} -Hp -t filesystem -oname,value,source mountpoint $SRCVOL" | sed 's/	/\!/g' > $SRCZFSLIST.mounts
   fi
