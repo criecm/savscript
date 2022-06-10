@@ -509,19 +509,20 @@ create_zfsdest() {
   dst_zfs_list | grep -q '^'${DSTV}'!' && return 0
   cmd="zfs create"$(src_ro_run "zfs get -s local,received -H -oproperty,value,source all ${SRCV}" | while read prop val source; do
      if [ "$prop" = "mountpoint" ]; then
-       if [ "$j" = "1" ]; then
-         debug "create_zfsdest($*): jailed fs"
-         echo -n " -o mountpoint=\"$val\""
-       elif [ "$val" != "none" -a "$val" != "legacy" ]; then
-         echo -n " -o orig:mountpoint=$val";
-         echo -n " -o mountpoint=$val";
-       else
+       if [ "$val" != "none" -a "$val" != "legacy" ]; then
+	 MNTPOINT=$val
+       fi
+       if [ "$MNTPOINT" != "$val" ]; then
+         echo -n " -o orig:mountpoint=\"$val\"";
          echo -n " -o mountpoint=\"$MNTPOINT\"";
        fi
      elif [ "$prop" = "volsize" ]; then
          echo -n " -V $val";
      elif [ "$prop" = "overlay" ]; then
          :
+     elif [ "$prop" = "jailed" ]; then
+         echo -n " -o jailed=off";
+         echo -n " -o orig:jailed=$val";
      else
        echo -n " -o $prop=\"$val\"";
      fi
