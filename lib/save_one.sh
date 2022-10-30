@@ -21,6 +21,7 @@ RSYNC_PORT=${RSYNC_PORT:-42873}
 #RSYNC_DIRECT=${RSYNC_DIRECT:-"YES"}
 RSYNC_DIRECT="NO"
 SAV_JAILS=${SAV_JAILS:-NO}
+SAV_DOWN_JAILS=${SAV_DOWN_JAILS:-NO}
 CANSKIP=${CANSKIP:-0}
 
 . $mydir/lib/savscript.inc.sh
@@ -50,6 +51,9 @@ if init_srv $DEST; then
     myret=0
 
     # JAILS
+    if [ "$SAV_DOWN_JAILS" = "YES" ] && [ -n "$INACTIVEJAILS" ]; then
+        JAILS="$JAILS $INACTIVEJAILS"
+    fi
     if [ "$SAV_JAILS" = "YES" ]; then
         if [ ! -z "$JAILS" ]; then
             # get cloned origins
