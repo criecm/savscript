@@ -189,8 +189,8 @@ if [ \"\$(uname -s)\" = \"FreeBSD\" -a \${SYSVER%%.*} -gt 6 ]; then
     echo INACTIVEJAILS=\\\"\$(cd /usr/local/etc/ezjail; ls | fgrep norun | xargs -L1 awk 'BEGIN { FS=\"\\\"\" } (\$1 ~ /rootdir/) { print \$2 }')\\\";
   fi
   if [ -x /usr/local/bin/iocage ]; then
-    echo INACTIVEJAILS=\\\"\$(/usr/local/bin/iocage list -hl | awk '((\$3 == \"down\")&&(\$2 != \"basejail\")) { printf(\"/iocage/jails/%s/root\\\n\",\$2);}')\\\";
-    echo IOJAILS=\\\"\$(/usr/local/bin/iocage list -hl | awk '(\$3 == \"up\") { printf(\"/iocage/jails/%s/root\\\n\",,\$2);}')\\\";
+    echo INACTIVEJAILS=\\\"\$(/usr/local/bin/iocage list -hl | awk '((\$4 == \"down\")&&(\$2 != \"basejail\")) { printf(\"/iocage/jails/%s/root\\\n\",\$2);}')\\\";
+    echo IOJAILS=\\\"\$(/usr/local/bin/iocage list -hl | awk '(\$4 == \"up\") { printf(\"/iocage/jails/%s/root\\\n\",\$2);}')\\\";
     echo IORIGIN=\\\"\$(zfs list -H -o origin -d 2 -r /iocage/jails|grep -v ^- | sed 's/@.*$//; s/\/root$//;' | sort -u )\\\";
   fi
 fi
@@ -647,7 +647,7 @@ is_iojail() {
     [ -z "$UUID" ] && return 1
     # name-based iocage (0.9.9+) (UUID is name)
     curjail=${UUID}
-    curjailsrc=$(get_zfs_src_for $curjaildir | sed 's@/root$@@')
+    curjailsrc=$(get_zfs_src_for $1 | sed 's@/root$@@')
     curjaildir=${1%/root}
 #echo "iocage 0.9.9+ curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
     return 0
