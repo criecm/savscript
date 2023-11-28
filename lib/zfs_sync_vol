@@ -680,6 +680,10 @@ fi
 export srcrocmd=$srccmd
 export dstrocmd=$dstcmd
 
+# cas srchost==IP
+if echo $SRCHOST | grep -q '^[0-9a-f\.;]*$'; then
+  SRCSNAPHOST=$(src_ro_run "hostname -s")
+fi
 #if [ ! -z "$JUSTFORFUN" ]; then
 #  inform "Running just for fun, don't worry :)"
 #  srccmd='echo DID NOT LAUNCH: # '$srccmd
