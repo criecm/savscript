@@ -88,7 +88,8 @@ rsync_excludes_for() {
             expr "$x" : "$(echo $1 | sed 's@/@\\/@g; s@\.@\\.@g;')" >/dev/null && tmpargs=$tmpargs"--exclude \"${x#$1}\" "
         ;;
         *)
-            tmpargs=$tmpargs"--exclude \"$x\" "
+            is_zfs_path $1 && test=$(get_srcdir_for_zfs $1) || test=$1
+            tmpargs=$tmpargs"--exclude \"$test\" "
         ;;
         esac
     done
@@ -103,7 +104,7 @@ now_exclude() {
 # exclus un volume ZFS pour la suite
 now_exclude_zfs() {
     grep -q '^'$1'$' $excludefrom.zfs 2>/dev/null || echo $1 >> $excludefrom.zfs
-    EXCLUDES=$EXCLUDES" "$1
+    p=$(get_srcdir_for_zfs $1) && EXCLUDES=$EXCLUDES" "$p || EXCLUDES=$EXCLUDES" "$1
 }
 
 # warn_admin retcode "object" "tracefile" "message"
