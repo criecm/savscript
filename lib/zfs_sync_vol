@@ -717,7 +717,7 @@ fi
 
 DSTMOUNTBASE=$(dst_zfs_list | grep '^'${DSTVOL}'!' | cut -d'!' -f2 2>/dev/null)
 
-echo "$DSTMOUNTBASE" | grep -q ^/ || DSTMOUNTBASE=$DSTBASE/${DSTVOL##*/}
+echo "$DSTMOUNTBASE" | grep -q ^/ || DSTMOUNTBASE=${DSTBASE%/}/${DSTVOL##*/}
 
 echo $DSTMOUNTBASE | grep -q ^$DSTBASE || erreur "$DSTMOUNTBASE n'est pas dans $DSTBASE ???"
 
