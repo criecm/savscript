@@ -4,29 +4,37 @@
 
 ## Features
 
-- aucune installation sur le "client" (/bin/sh, rsync ou zfs)
-- pur /bin/sh, ssh, rsync (du connu :) et ZFS !
-- prevu/utilisé avec un serveur FreeBSD/ZFS et clients OpenBSD, FreeBSD, Linux divers
-- sauvegarde des jails freebsd a part (iocage ou jails "standard")
-- dependences côté serveur: rsync, fping, mutt (mbuffer conseillé)
+- agent-less (ssh, /bin/sh, rsync or zfs)
+- /bin/sh scripted
+- server on FreeBSD/ZFS (may work elsewhere)
+- clients tested: Linux/OpenBSD/FreeBSD (any unix-like OS should work)
+- FreeBSD jails can be saved apart (and not depend on their host)
+
+## Dependencies
+- rsync for any non-zfs client
+- fping
+- mutt for reporting
+- mbuffer advised (not mandatory)
+- root access on clients, with ssh key only
 
 ## HOWTO
 
-### nouveau serveur
-1. git clone
-2. creez une paire de cles ssh pour la sauvegarde: (la cle publique sera installee sur chaque client dans `~root/.ssh/authorized_keys`)
+### new backup server
+1. git clone this
+2. Create a new ssh key pair only for backups, this key will be authorized from this host only
 
   `ssh-keygen -C "savscript@$(hostname -s)" -N '' -f id_sav`
 
-3. copiez savscript.conf.dist en savscript.conf
-4. editez savscript.conf (`SSH_KEY`,`SAVDIR`, …)
-5. ajoutez au crontab une ligne du type:
+3. copy savscript.conf.dist to savscript.conf
+4. edit savscript.conf (`SSH_KEY`,`SAVDIR`, …)
+5. add a client and test
+6. add to crontab
 
-  `32 23 * * *	root	/chemin/vers/savscript.sh`
+  `32 23 * * *	root	/path/to/savscript.sh`
  
 
-### nouveau client
-1. utilisez `./tools/nouvelle_machine.sh` pour ajouter une machine dans machines.d/ automatiquement
-2. lancez `./savscript.sh` (avec -v en cas de problème)
+### new client
+1. use `./tools/nouvelle_machine.sh my.client` to create a config file in machines.d/ and deploy ssh key on clients
+2. launch `./savscript.sh` (with `-v` if needed)
 
 
