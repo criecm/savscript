@@ -10,3 +10,5 @@ SAV_JAILS="%%SAVJAILS%%"
 # lance un serveur rsync sur la destination au lieu de passer par ssh
 # default: YES (essaye, fallback to ssh)
 #RSYNC_DIRECT="NO"
+# sauvegardes des vms proxmox
+SAV_PROXMOX="%%SAVPROXMOX%%"

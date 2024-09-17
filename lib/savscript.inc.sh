@@ -170,11 +170,15 @@ srvinfos=$DESTDIR.infos
 # - SYSVER (uname -r)
 # - FSLIST (liste de fstype:/montage)
 # - RSYNC_SRV_PID si un demon rsync a pu etre lance sur $RSYNC_PORT
+# - ZFSFSES (zfs filesystems)
+# - ZPOOLS (pools zfs)
+# - ZFSSLASH (racine ZFS si 'legacy')
 # si FreeBSD:
 #   - JAILS (liste de repertoires)
-#   - ZPOOLS (pools zfs)
-#   - ZFSSLASH (racine ZFS si 'legacy')
-#   - ZFSFSES (zfs filesystems)
+# si Linux/Proxmox:
+#   - PVESTORAGES (liste des storages *locaux*)
+#   - PVELXCS (liste des containers LXC avec leurs disques)
+#   - PVEQMS (liste des vm's qemu avec leurs disques)
 init_srv() {
     if fping -q $DEST; then
         test -f $srvinfos && mv $srvinfos $srvinfos.last
@@ -202,6 +206,16 @@ if [ \$(mount -t zfs | wc -l) -gt 0 ]; then
     echo ZFSFSES=\\\"\$(zfs list -H -t filesystem -o jailed,name,mountpoint | grep -v '^on.*none' | awk '/^on/{j=\$2;gsub(\"^.*jails/\",\"\",j);gsub(\"/.*\$\",\"\",j); printf(\"/iocage/jails/%s/root%s|%s\\\n\",j,\$3,\$2)}/^off/{printf(\"%s|%s\\\n\",\$3,\$2);}')\\\";
   else
     echo ZFSFSES=\\\"\$(zfs list -H -t filesystem -o name,mountpoint | awk '{printf(\"%s|%s\\\n\",\$2,\$1);}')\\\";
+  fi
+fi
+if [ \"\$(uname -s)\" = \"Linux\" ] && [ -e \"/etc/pve/local\" ]; then
+  echo PVECLUSTER=\\\"\$(pvecm status|grep ^Name: | awk '{print \$NF}')\\\"
+  echo PVESTORAGES=\\\"\$(pvesm status | awk '{if(\$3==\"active\"){print \$1}}' | while read s; do pvesh get /storage/\$s --noborder --noheader | awk 'BEGIN{want=0;zpool=\"\";dpath=\"\"}/^content.*images/{want=1;}/^pool/{zpool=\$2;}/^shared.*1$/{want=0;}/^(path|mountpoint)/{dpath=\$2; want=1;}END{if(want==1){printf(\"'\$s':%s %s\\\n\",dpath,zpool)}}'; done)\\\";
+  if [ -x /usr/sbin/pct ]; then
+    echo PVELXCS=\\\"\$(pct list | grep ' running *[^$]' | awk '{if(\$2==\"running\"){print \$1}}')\\\";
+  fi
+  if [ -x /usr/sbin/qm ]; then
+    echo PVEQMS=\\\"\$(qm list | grep ' running *[0-9]' | awk '{ print \$1 }')\\\";
   fi
 fi" > $srvinfos 2> $TRACES/$NAME.init_srv
         . $srvinfos >> $TRACES/$NAME.init_srv 2>&1
@@ -736,3 +750,46 @@ debug "jail fs curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
     debug "JAIL $curjail: END($(($ret+${cret})))"
 }
 
+## PROXMOX
+# liste les stockages locaux
+resolve_proxmox_storage() {
+    storage=$1
+    # dir
+    d=$(echo "$PVESTORAGES" | grep "${1%:*}" | cut -d' ' -f1 | cut -d: -f2)
+    # zfs source if any
+    z=$(echo "$PVESTORAGES" | grep "${1%:*}" | cut -d' ' -f2)
+    [ -n "$d" ] || return 1
+    echo "${d}|${z}"
+}
+# sauvegarde d'un LXC
+get_proxmox_lxc() {
+    lxc_id=$1
+    init_zfs_dest none ${PVEDESTDIR}/${lxc_id} ${PVEZFSDEST}/${lxc_id}
+    doit $REMOTE_COMMAND $DEST "pct config $lxc_id" > ${PVEDESTDIR}/${lxc_id}/config
+    echo $DEST > ${PVEDESTDIR}/${lxc_id}/host
+    for disk in $(awk '/^(rootfs|mp[0-9]+):/{gsub(",.*","");if($2!="none"){printf("%s",$2);}}' ${PVEDESTDIR}/${lxc_id}/config); do
+        if storage=$(resolve_proxmox_storage $disk); then
+            if [ -n "${storage#*|}" ]; then
+                get_zfs ${storage%|*}/${disk#*:} ${PVEZFSDEST}/${lxc_id}/${disk#*:} ${storage#*|}/${disk#*:}
+            else
+                get_fs ${storage%|*}/${disk#*:} ${PVEDESTDIR}/${lxc_id}/${disk#*:}
+            fi
+        fi
+    done
+}
+# sauvegarde d'une VM qemu
+get_proxmox_qemu() {
+    qemu_id=$1
+    init_zfs_dest none ${PVEDESTDIR}/${qemu_id} ${PVEZFSDEST}/${qemu_id}
+    doit $REMOTE_COMMAND $DEST "qm config $qemu_id" > ${PVEDESTDIR}/${qemu_id}/config
+    echo $DEST > ${PVEDESTDIR}/${qemu_id}/host
+    for disk in $(awk '/^(virtio|scsi|ide)[0-9]+:/{gsub(",.*","");if($2!="none"){printf("%s",$2);}}' ${PVEDESTDIR}/${qemu_id}/config); do
+        if storage=$(resolve_proxmox_storage $disk); then
+            if [ -n "${storage#*|}" ]; then
+                get_zfs ${storage%|*}/${disk#*:} ${PVEZFSDEST}/${qemu_id}/${disk#*:} ${storage#*|}/${disk#*:}
+            else
+                get_fs ${storage%|*}/${disk#*:} ${PVEDESTDIR}/${qemu_id}/${disk#*:}
+            fi
+        fi
+    done
+}

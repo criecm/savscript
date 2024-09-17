@@ -22,6 +22,7 @@ RSYNC_PORT=${RSYNC_PORT:-42873}
 RSYNC_DIRECT="NO"
 SAV_JAILS=${SAV_JAILS:-NO}
 SAV_DOWN_JAILS=${SAV_DOWN_JAILS:-NO}
+SAV_PROXMOX=${SAV_PROXMOX:-NO}
 CANSKIP=${CANSKIP:-0}
 
 . $mydir/lib/savscript.inc.sh
@@ -77,6 +78,27 @@ if init_srv $DEST; then
         now_exclude_zfs ${IORIGIN%%/releases*}/releases
         now_exclude_zfs ${IORIGIN%%/releases*}/download
     fi
+
+    # PROXMOX part
+    if [ "$SAV_PROXMOX" = "YES" ] && [ -n "$PVECLUSTER" ]; then
+        PVEZFSDEST="${SAVZFSBASE}/$PVECLUSTER"
+        PVEDESTDIR="$(zfs list -Homountpoint $PVEZFSDEST 2>/dev/null || ( zfs create $PVEZFSDEST && zfs list -Homountpoint $PVEZFSDEST ) )"
+        for lxc in $(echo "$PVELXCS"); do
+            syslogue "debug" "($NAME) get PVE LXC $lxc"
+            get_proxmox_lxc $lxc
+            [ "$SNAP_AFTER" = "YES" ] && justdoit snapshot_dest $PVEZFSDEST/$lxc
+        done
+        for qemu in $(echo "$PVEQMS"); do
+            syslogue "debug" "($NAME) get PVE QEMU $qemu"
+            get_proxmox_qemu $qemu
+            [ "$SNAP_AFTER" = "YES" ] && justdoit snapshot_dest $PVEZFSDEST/$qemu
+        done
+        for storage in $(echo "$PVESTORAGES" | grep ' [^$]'); do
+            syslogue "debug" "($NAME) now exclude ${storage#*|}"
+            now_exclude_zfs ${storage#* }
+        done
+    fi
+
     # FULL ZFS SCENARIO
     if [ "$FULLZFS" = "YES" ]; then
         # tout est en ZFS: cool :)
