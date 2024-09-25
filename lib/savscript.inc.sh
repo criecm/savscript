@@ -767,7 +767,7 @@ get_proxmox_lxc() {
     init_zfs_dest none ${PVEDESTDIR}/${lxc_id} ${PVEZFSDEST}/${lxc_id}
     doit $REMOTE_COMMAND $DEST "pct config $lxc_id" > ${PVEDESTDIR}/${lxc_id}/config
     echo $DEST > ${PVEDESTDIR}/${lxc_id}/host
-    for disk in $(awk '/^(rootfs|mp[0-9]+):/{gsub(",.*","");if($2!="none"){printf("%s",$2);}}' ${PVEDESTDIR}/${lxc_id}/config); do
+    for disk in $(awk '/^(rootfs|mp[0-9]+):/{gsub(",.*","");if($2!="none"){printf("%s\n",$2);}}' ${PVEDESTDIR}/${lxc_id}/config); do
         if storage=$(resolve_proxmox_storage $disk); then
             if [ -n "${storage#*|}" ]; then
                 get_zfs ${storage%|*}/${disk#*:} ${PVEZFSDEST}/${lxc_id}/${disk#*:} ${storage#*|}/${disk#*:}
@@ -783,7 +783,7 @@ get_proxmox_qemu() {
     init_zfs_dest none ${PVEDESTDIR}/${qemu_id} ${PVEZFSDEST}/${qemu_id}
     doit $REMOTE_COMMAND $DEST "qm config $qemu_id" > ${PVEDESTDIR}/${qemu_id}/config
     echo $DEST > ${PVEDESTDIR}/${qemu_id}/host
-    for disk in $(awk '/^(virtio|scsi|ide)[0-9]+:/{gsub(",.*","");if($2!="none"){printf("%s",$2);}}' ${PVEDESTDIR}/${qemu_id}/config); do
+    for disk in $(awk '/^(virtio|scsi|ide)[0-9]+:/{gsub(",.*","");if($2!="none"){printf("%s\n",$2);}}' ${PVEDESTDIR}/${qemu_id}/config); do
         if storage=$(resolve_proxmox_storage $disk); then
             if [ -n "${storage#*|}" ]; then
                 get_zfs ${storage%|*}/${disk#*:} ${PVEZFSDEST}/${qemu_id}/${disk#*:} ${storage#*|}/${disk#*:}
