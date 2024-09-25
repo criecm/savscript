@@ -173,4 +173,7 @@ if [ -s $TRACES/msg ]; then
   fi
 fi
 if [ $DEBUG -le 1 ]; then rm -rf $TRACES; fi
-
+# cleanup ssh master sockets
+pgrep -fl 'ssh: '$TRACESDIRBASE | while read pid ssh sock reste; do
+  test -d ${sock%/*} || kill $pid
+done
