@@ -73,10 +73,13 @@ if init_srv $DEST; then
                 fi
             done
         fi
-    fi
-    if [ ! -z "$IORIGIN" ]; then
-        now_exclude_zfs ${IORIGIN%%/releases*}/releases
-        now_exclude_zfs ${IORIGIN%%/releases*}/download
+	if [ ! -z "$IOJAILS" ]; then
+		now_exclude_zfs $(get_zfs_src_for /iocage/jails)
+	fi
+	if [ ! -z "$IORIGIN" ]; then
+		now_exclude_zfs ${IORIGIN%%/releases*}/releases
+		now_exclude_zfs ${IORIGIN%%/releases*}/download
+	fi
     fi
 
     # PROXMOX part
