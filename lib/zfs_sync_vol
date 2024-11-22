@@ -512,7 +512,7 @@ create_zfsdest() {
   local VOLSIZE=""
   src_zfs_list | grep -q '^'${SRCV}'!.*!on$' && local j=1
   dst_zfs_list | grep -q '^'${DSTV}'!' && return 0
-  cmd="zfs create"$(src_ro_run "zfs get -s local,received -H -oproperty,value,source all ${SRCV}" | while read prop val source; do
+  cmd="zfs create${NODSTMOUNT:+ -u} "$(src_ro_run "zfs get -s local,received -H -oproperty,value,source all ${SRCV}" | while read prop val source; do
      if [ "$prop" = "mountpoint" ]; then
        if [ "$val" != "none" -a "$val" != "legacy" ]; then
 	 MNTPOINT=$val
