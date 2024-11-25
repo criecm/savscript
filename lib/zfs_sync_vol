@@ -417,8 +417,13 @@ correct_mountpoints() {
   if [ -z "$DSTREMOUNTORIG" -a ! -z "$CORRECTMOUNTS" ]; then
     inform "Enregistrement+modification des points de montage originaux sur ${DSTVOL}"
     dst_run 'zfs get -s received -Hp -r -t filesystem -oname,value mountpoint '${DSTVOL}' | sort -r | while read vol val; do
-      if [ "$val" != "legacy" ] && [ "$val" != "none" ]; then
-        zfs set mountpoint=${DSTMOUNTBASE}${val#$SRCMOUNTBASE} $vol;
+      if echo "$val" | grep "^/"; then
+        if [ "$val" = "/" ]; then
+            mounton=${DSTMOUNTBASE}
+        else
+            mounton=${DSTMOUNTBASE}/${val#$SRCMOUNTBASE}
+        fi
+        zfs set mountpoint=${mounton} $vol;
         zfs set orig:mountpoint=$val $vol;
       fi;
     done'
