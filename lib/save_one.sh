@@ -135,6 +135,11 @@ if init_srv $DEST; then
 
 	    if [ "$(zfs get -H -o value mountpoint $ZFSDEST/${ZFSSLASH#*/})" != "$DESTDIR" ]; then
                 zfs set mountpoint=$DESTDIR $ZFSDEST/${ZFSSLASH#*/}
+                if [ "$(zfs get -H -o value canmount $ZFSDEST/${ZFSSLASH#*/})" = "noauto" ]; then
+                    zfs set orig:canmount=noauto $ZFSDEST/${ZFSSLASH#*/}
+                    zfs set canmount=on $ZFSDEST/${ZFSSLASH#*/}
+                    [ "$(zfs get -H -o value mounted $ZFSDEST/${ZFSSLASH#*/})" = "yes" ] || zfs mount $ZFSDEST/${ZFSSLASH#*/}
+                fi
             fi
         fi
         # modification des points de montage si besoin (protection du systeme local !)
@@ -146,13 +151,13 @@ if init_srv $DEST; then
             [ $myret -eq 0 ] || MOUNTPROBLEM="YES"
             warn_admin $myret "FULLZFS:correction_montages" "$TRACES/$NAME.corrections_montages.sh" "Certains points de montages dangereux ${MOUNTPROBLEM:+non }corriges ${MOUNTPROBLEM:+\!}"
         fi
-        # remontage dans l'ordre si / a un mountpoint 'legacy' (monte par fstab) ou autre
+        # remontage dans l'ordre si / a un mountpoint 'legacy' (monte par fstab) ou canmount=noauto (nouvelle methode)
         if [ ! -z "$ZFSSLASH" -a -z "$MOUNTPROBLEM" ]; then
             syslogue "info" "($NAME) FULLZFS: remontage dans l'ordre (racine en ZFS)"
-            zfs list -H -o canmount,mountpoint,name,mounted -S name -r $ZFSDEST | awk '($1 ~ /^on$/ && $2 !~ /^legacy$/ && $4 ~ /^yes$/) { print $3 }' | xargs -L1 zfs umount
+            zfs list -H -o canmount,mountpoint,name,mounted -S name -r $ZFSDEST | awk '($1 ~ /^on$/ && $2 ~ /^\// && $4 ~ /^yes$/) { print $3 }' | xargs -L1 zfs umount
             mount | grep '^'$ZFSDEST'.* on '$DESTDIR | awk '{print $1}' | sort -r | xargs -L1 umount -f || mount -tzfs | grep '^'$ZFSDEST'.* on '$DESTDIR
             mount -tzfs $ZFSDEST/${ZFSSLASH#*/} $DESTDIR
-            zfs list -H -o canmount,jailed,mountpoint,name -r $ZFSDEST | awk '($1 ~ /^on$/ && $2 !~ /^on$/ && $3 !~ /^(legacy|none)$/ && $3 ~ /'$(echo $DESTDIR|sed 's@/@\\/@g')'/) { print $4 }' | while read z; do
+            zfs list -H -o canmount,jailed,mountpoint,name -r $ZFSDEST | awk '($1 ~ /^on$/ && $2 !~ /^on$/ && $3 !~ /^legacy$/ && $3 ~ /'$(echo $DESTDIR|sed 's@/@\\/@g')'/) { print $4 }' | while read z; do
                 mount | grep -q "^$z " || zfs mount $z
             done
         fi
