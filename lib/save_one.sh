@@ -74,12 +74,10 @@ if init_srv $DEST; then
             done
         fi
 	if [ ! -z "$IOJAILS" ]; then
-		now_exclude_zfs $(get_zfs_src_for /iocage/jails)
+		now_exclude $(get_zfs_src_for /iocage/jails)
 	fi
-	if [ ! -z "$IORIGIN" ]; then
-		now_exclude_zfs ${IORIGIN%%/releases*}/releases
-		now_exclude_zfs ${IORIGIN%%/releases*}/download
-	fi
+	now_exclude ${IORIGIN%%/releases*}/releases
+	now_exclude ${IORIGIN%%/releases*}/download
     fi
 
     # PROXMOX part
@@ -98,7 +96,7 @@ if init_srv $DEST; then
         done
         for storage in $(echo "$PVESTORAGES" | grep ' [^$]'); do
             syslogue "debug" "($NAME) now exclude ${storage#*|}"
-            now_exclude_zfs ${storage#* }
+            now_exclude ${storage#* }
         done
     fi
 
@@ -106,7 +104,7 @@ if init_srv $DEST; then
     if [ "$FULLZFS" = "YES" ]; then
         # tout est en ZFS: cool :)
         for testfs in $ZFSFSES; do
-            is_excluded ${testfs%|*} && now_exclude_zfs ${testfs#*|}
+            is_excluded ${testfs%|*} && now_exclude ${testfs#*|}
         done 
         # si aucune exclusion + c'est le seul zpool, alors on lance en un coup
         #export DONOTEXCLUDEZFS="for now"

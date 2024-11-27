@@ -67,18 +67,31 @@ rsync_it() {
 
 # teste si un chemin est a exclure
 is_excluded() {
-    test -z "$EXCLUDES" && return 1
-    [ "$1" = "/" ] && return 1
-    for excluded in $(echo $EXCLUDES | sed 's@/@\\/@g'); do
-        expr "$1" : "${excluded%/}" >/dev/null && return 0
-    done
+    local testsrc=$1
+    case "$testsrc" in
+      /*)
+        [ -s "$excludefrom" ] || return 1
+        while [ -n "$testsrc" ]; do
+          grep -q "^${testsrc}$" $excludefrom && return 0
+          testsrc=${testsrc%/*}
+        done
+        ;;
+      *)
+        [ -s "$excludefrom.zfs" ] || return 1
+        while [ -n "$testsrc" ] && [ "$testsrc" != "${otestsrc:-nadaquedalle}" ]; do
+          grep -q "^${testsrc%/}$" $excludefrom.zfs && return 0
+          otestsrc=$testsrc
+          testsrc=${testsrc%/*}
+        done
+        ;;
+    esac
     return 1
 }
 
 # construit une liste d'exclusions pour rsync
 rsync_excludes_for() {
-    test -z "$EXCLUDES" && return 1
-    for x in $EXCLUDES; do
+    test -s "$excludefrom" || return 1
+    for x in $(cat $excludefrom); do
         case $x in
         /)
             syslogue "error" "excluding / ?"
@@ -98,13 +111,35 @@ rsync_excludes_for() {
 
 # exclus un chemin de la suite
 now_exclude() {
-    EXCLUDES=$EXCLUDES" "$1
-}
-
-# exclus un volume ZFS pour la suite
-now_exclude_zfs() {
-    grep -q '^'$1'$' $excludefrom.zfs 2>/dev/null || echo $1 >> $excludefrom.zfs
-    p=$(get_srcdir_for_zfs $1) && EXCLUDES=$EXCLUDES" "$p || EXCLUDES=$EXCLUDES" "$1
+    for arg in $*; do
+      is_excluded "$arg" && return 0
+      case "$arg" in
+        /*)
+          syslogue "debug" "now_exclude($arg): path"
+          echo "$arg" >> $excludefrom
+          if [ -n "$ZFSFSES" ]; then
+              for zfsdesc in $ZFSFSES; do
+                  if [ "${zfsdesc%|*}" = "$arg" ]; then
+                      grep -q "^${zfsdesc#*|}$" $excludefrom.zfs 2>/dev/null || echo "${zfsdesc#*|}" >> $excludefrom.zfs
+                  fi
+              done
+          fi
+          ;;
+        *)
+          syslogue "debug" "now_exclude($arg): ZFS"
+          if [ -n "$ZFSFSES" ]; then
+            for zfsdesc in $ZFSFSES; do
+              if [ "${zfsdesc#*|}" = "$arg" ]; then
+                echo ${zfsdesc#*|} >> $excludefrom.zfs
+                echo "${zfsdesc%|*}" | grep -q "^/..*" || continue
+                grep -q "^${zfsdesc%|*}$" $excludefrom ||  echo "${zfsdesc%|*}" >> $excludefrom
+                return 0
+              fi
+            done
+          fi
+          ;;
+      esac
+    done
 }
 
 # warn_admin retcode "object" "tracefile" "message"
@@ -232,16 +267,15 @@ fi" > $srvinfos 2> $TRACES/$NAME.init_srv
     if [ "$SYSTEM" = "FreeBSD" ]; then
         #on cree le fichier d'exclusions pour zfs
         test -f $excludefrom.zfs && rm $excludefrom.zfs
+        test -f $excludefrom && rm $excludefrom
         # si jails inactifs, on les exclue
         if [ ! -z "$INACTIVEJAILS" ]; then
-            EXCLUDES=$EXCLUDES" "$INACTIVEJAILS
+            now_exclude $(echo $INACTIVEJAILS)
         fi
-        # traduit les exclusions de repertoires en volumes zfs
-        if [ ! -z "$EXCLUDES" -a ! -z "$ZFSFSES" ]; then
-            for zfsdesc in $ZFSFSES; do
-                if is_excluded "${zfsdesc%|*}"; then
-                    now_exclude_zfs "${zfsdesc#*|}"
-                fi
+        # transfere les exclusions dans les fichiers d'exclusion
+        if [ ! -z "${EXCLUDES:-$DEFAULT_EXCLUDES}" ]; then
+            for e in $(echo ${EXCLUDES:-$DEFAULT_EXCLUDES}); do
+                now_exclude "$e"
             done
         fi
         for fsdesc in $FSLIST; do
@@ -634,7 +668,7 @@ get_zfs() {
     # TEMP: reverse ca: readonly s'herite
     #zfs get -H -o name,source -t filesystem -r readonly ${d} | grep -v '^'${d}'	' | cut -f 1 | xargs -L1 zfs inherit readonly
     zfs get -H -o name,value -t filesystem readonly ${d} | grep -q 'off$' && zfs set readonly=on ${d}
-    [ -n "$DONOTEXCLUDEZFS" ] || now_exclude_zfs $s
+    #[ -n "$DONOTEXCLUDEZFS" ] || now_exclude $s
     say_end_with $ret
 }
 

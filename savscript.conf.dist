@@ -43,8 +43,8 @@ FSTYPES=zfs,ufs,ext2,ext3,ext4,ffs,btrfs,xfs,jfs
 # syslog facility
 SYSLOG_FACILITY=local4
 
-# excludes obligatoires
-DEFAULT_EXCLUDES="/mnt .snap/ .zfs/"
+# excludes par defaut
+DEFAULT_EXCLUDES="/mnt"
 
 # debug (LAISSER 0 ou desactiver le cron !)
 # 0: normal (logs standards + problemes)
