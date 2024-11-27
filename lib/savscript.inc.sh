@@ -11,7 +11,7 @@
 excludefrom=$TRACES/$NAME.excludes
 ZEXCLUDES="-x $excludefrom.zfs"
 #ZOPTS="-k $SSH_KEY -C -m 'GMT-%Y.%m.%d-%H.%M.%S' -I"
-ZOPTS="-k $SSH_KEY -CUup"
+ZOPTS="-k $SSH_KEY -Cup"
 ZRECURSION="-r"
 
 if [ $DEBUG -ge 4 ]; then
@@ -190,6 +190,13 @@ snapshot_dest() {
       syslogue "notice" "snapshot_dest($*): destroy $s ($keep)"
       zfs destroy -r $s
     fi
+  done
+}
+
+zfs_mount_recurse() {
+  syslogue "debug" "mount_recurse($1)"
+  for z in $(zfs list -H -o canmount,jailed,mountpoint,name -r $1 | awk '($1 ~ /^on$/ && $2 !~ /^on$/ && $3 ~ /^\// && $3 ~ /'$(echo $DESTDIR|sed 's@/@\\/@g')'/) { print $4 }'); do
+      doit "mount | grep -q "^$z " || zfs mount $z"
   done
 }
 
@@ -427,23 +434,28 @@ is_zfs_path() {
 # determine le rep destination pour une source
 get_destdir_for() {
     is_zfs_path $1 && test=$(get_srcdir_for_zfs $1) || test=$1
+    syslogue "debug" "get_destdir_for($1 - $test) => ?)"
+    reltest=${test#/}
     if is_jailed $test; then
+        syslogue "debug" "get_destdir_for($1) (jailed) => $JAILSDESTDIR/$curjail${test#$curjaildir}"
         echo $JAILSDESTDIR/$curjail${test#$curjaildir}
     else
-        echo $DESTDIR${test%*/}
+        syslogue "debug" "get_destdir_for($1) => $DESTDIR${reltest:+/}${reltest%/}"
+        echo $DESTDIR${reltest:+/}${reltest%/}
     fi
 }
 
 # determine la destination ZFS
 get_zfsdest_for() {
     is_zfs_path $1 && test=$(get_srcdir_for_zfs $1) || test=$1
-    syslogue "debug" "get_zfsdest_for($1) => ?)"
+    syslogue "debug" "get_zfsdest_for($1 - $test) => ?)"
+    reltest=${test#/}
     if is_jailed $test; then
         echo $JAILSZFSDEST/$curjail${test#$curjaildir}
         syslogue "debug" "get_zfsdest_for($1) => $JAILSZFSDEST / $curjail ${test#$curjaildir/}"
     else
-        echo $ZFSDEST${test%*/}
-        syslogue "debug" "get_zfsdest_for($1) => $ZFSDEST/${test%*/}"
+        echo $ZFSDEST${reltest:+/}${reltest%/}
+        syslogue "debug" "get_zfsdest_for($1) => $ZFSDEST${reltest:+/}${reltest%/}"
     fi
 }
 
@@ -698,6 +710,7 @@ is_iojail() {
     curjail=${UUID}
     curjailsrc=$(get_zfs_src_for $1 | sed 's@/root$@@')
     curjaildir=${1%/root}
+    curjailroot="${curjaildir}/root"
 #echo "iocage 0.9.9+ curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
     return 0
 }
@@ -715,12 +728,14 @@ is_jailed() {
            curjail=${j##*/}
            curjaildir=${j}
            curjailsrc=$(get_zfs_src_for $curjaildir | sed 's@/root$@@')
+           curjailroot=${j}
            return 0
        fi
     done
     curjail=""
     curjaildir=""
     curjailsrc=""
+    curjailroot=""
     return 1
 }
 
@@ -733,7 +748,7 @@ get_jail() {
 
     L=$TRACES/$NAME.jail.$curjail
 
-    debug "JAIL $curjail: BEGIN"
+    syslogue "debug" "JAIL $curjail: BEGIN"
 
     zjdest=$JAILSZFSDEST/${curjail}
     jdest=$JAILSDESTDIR/${curjail}
@@ -741,26 +756,53 @@ get_jail() {
     local ret=0
     local cret=0
     if is_iojail $jaildir; then
-debug "iocage curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
+syslogue "debug" "iocage curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
         get_zfs ${curjaildir} $JAILSZFSDEST/$curjail ${curjailsrc}
         ret=$?
-        now_exclude ${curjaildir}
-        now_exclude_zfs ${curjailsrc}
+        now_exclude ${curjailsrc}
         [ "$SNAP_AFTER" = "YES" ] && snapshot_dest $JAILSZFSDEST/$curjail
+        zfs list -H -o mountpoint,name,jailed -r $JAILSZFSDEST/$curjail | awk '{
+          if($1 !~ /^'$(echo $jdest|sed 's@/@\\/@g')'/ && $1 ~ /^\//){
+            rel=$1;
+            gsub("^/$","",rel);
+            if($3 ~ /^on$/){
+              printf("zfs set orig:jailed=on jailed=off orig:mountpoint=%s mountpoint='$jdest'/root%s %s;\n",$1,rel,$2);
+            }
+            else{
+              rdest=$1;
+              gsub("'$curjaildir'","",rdest);
+              gsub("^/$","",rdest);
+              printf("zfs set mountpoint='$jdest'/root%s orig:mountpoint=%s %s;\n",rdest,$1,$2);
+            }
+          }
+        }' > $TRACES/$NAME.$curjail.corrections_montages.sh 2>> $TRACES/$NAME.$curjail.corrections_montages.log
+        echo "backup_from=$NAME" > $jdest.infos
+        echo "last_backup=$(date)" >> $jdest.infos
     else
         if is_fstype zfs ${curjaildir}; then
-debug "jail zfs curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
+syslogue "debug" "jail zfs curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
             get_zfs ${curjaildir} $JAILSZFSDEST/$curjail ${curjailsrc}
             ret=$?
-            now_exclude ${curjaildir}
-            now_exclude_zfs ${curjailsrc}
+            now_exclude ${curjailsrc}
+            zfs list -H -o mountpoint,name,jailed -r $JAILSZFSDEST/$curjail | awk '{
+              if($1 !~ /^'$(echo $jdest|sed 's@/@\\/@g')'/ && $1 ~ /^\//){
+                rel=$1;
+                gsub("^/$","",rel);
+                if($3 ~ /^on$/){
+                  printf("zfs set orig:jailed=on jailed=off orig:mountpoint=%s mountpoint='$jdest'%s %s;\n",$1,rel,$2);
+                }
+                else{
+                  printf("zfs set mountpoint='$jdest'%s orig:mountpoint=%s %s;\n",rdest,$1,$2);
+                }
+              }
+            }' > $TRACES/$NAME.$curjail.corrections_montages.sh 2>> $TRACES/$NAME.$curjail.corrections_montages.log
         elif is_fstype ufs ${curjaildir}; then
-debug "jail ufs curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
+syslogue "debug" "jail ufs curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
             get_ufs ${curjaildir} $JAILSDESTDIR/$curjail $JAILSZFSDEST/$curjail
             ret=$?
             now_exclude ${curjaildir}
         else
-debug "jail fs curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
+syslogue "debug" "jail fs curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
             get_fs ${curjaildir} $JAILSDESTDIR/$curjail
             ret=$?
             now_exclude ${curjaildir}
@@ -781,7 +823,13 @@ debug "jail fs curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
             warn_admin $cret "get_jail($*)/get_config" $L "Pb pour recuperer la config du jail $curjail"
         fi
     fi
-    debug "JAIL $curjail: END($(($ret+${cret})))"
+    if [ -s "$TRACES/$NAME.$curjail.corrections_montages.sh" ]; then
+      syslogue "info" "JAIL $curjail: corrige montages"
+      chmod +x $TRACES/$NAME.$curjail.corrections_montages.sh
+      doit $TRACES/$NAME.$curjail.corrections_montages.sh
+      zfs_mount_recurse $JAILSZFSDEST/$curjail
+    fi
+    syslogue "debug" "JAIL $curjail: END($(($ret+${cret})))"
 }
 
 ## PROXMOX
