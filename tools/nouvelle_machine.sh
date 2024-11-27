@@ -28,8 +28,8 @@ case "$SYSTEM" in
         EXCLUDES="/var/cache/apt/archives"
     ;;
     esac
-    FSLIST="`for fst in ext3 ext4 ext2 btrfs; do df -t $fst; done | tail -n +2 | awk '\''{print $6}'\''`"
-    PVE=$(stat --printf=%N /etc/pve/local | awk '\''{print $NF}'\'')
+    PVE=$(stat --printf=%N /etc/pve/local)
+    FSLIST="`for fst in ext3 ext4 ext2 btrfs; do df -t $fst 2>/dev/null; done | tail -n +2 | awk '\''{print $6}'\''`"
 ;;
 "FreeBSD")
     EXCLUDES=""
@@ -51,6 +51,7 @@ echo RSYNC=\"`which rsync`\"
 echo MYIP=\"`echo $SSH_CONNECTION | cut -d" " -f3`\"
 echo JAILS=\"$JAILS\"
 echo FSLIST=\"$FSLIST\"
+echo PVE=\"$PVE\"
 echo MYNAME="`hostname -s`"')
 
 echo SYSTEM=$SYSTEM
