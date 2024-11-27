@@ -419,10 +419,10 @@ correct_mountpoints() {
     dst_run 'zfs get -s received -Hp -r -t filesystem -oname,value mountpoint '${DSTVOL}' | sort -r | while read vol val; do
       if echo "$val" | grep "^/"; then
         if [ "$val" = "/" ]; then
-            mounton=${DSTMOUNTBASE}
+            mounton=${DSTMOUNTBASE};
         else
-            mounton=${DSTMOUNTBASE}/${val#$SRCMOUNTBASE}
-        fi
+            mounton=${DSTMOUNTBASE}/${val#${SRCMOUNTBASE}/};
+        fi;
         zfs set mountpoint=${mounton} $vol;
         zfs set orig:mountpoint=$val $vol;
       fi;
@@ -434,9 +434,9 @@ correct_mountpoints() {
     inform "Restauration des points de montage originaux sur ${DSTVOL}"
     dst_run 'zfs get -s received,local -Hp -t filesystem -r -oname,value orig:mountpoint '${DSTVOL}' | sort -r | while read vol val; do
       if [ "$val" != "-" ]; then
-        zfs set mountpoint=$val $vol
-        zfs inherit orig:mountpoint $vol
-      fi
+        zfs set mountpoint=$val $vol;
+        zfs inherit orig:mountpoint $vol;
+      fi;
     done'
   fi
 }
@@ -513,16 +513,13 @@ create_zfsdest() {
   debug "create_zfsdest($*)"
   local DSTV=${1:-$DSTVOL}
   local SRCV=${2:-$SRCVOL}
-  local MNTPOINT=${3:-$(get_mountpoint $DSTV)}
+  local MNTPOINT=${3:-""}
   local VOLSIZE=""
   src_zfs_list | grep -q '^'${SRCV}'!.*!on$' && local j=1
   dst_zfs_list | grep -q '^'${DSTV}'!' && return 0
   cmd="zfs create${NODSTMOUNT:+ -u} "$(src_ro_run "zfs get -s local,received -H -oproperty,value,source all ${SRCV}" | while read prop val source; do
      if [ "$prop" = "mountpoint" ]; then
-       if [ "$val" != "none" -a "$val" != "legacy" ]; then
-	 MNTPOINT=$val
-       fi
-       if [ "$MNTPOINT" != "$val" ]; then
+       if [ -n "$MNTPOINT" ] && [ "$MNTPOINT" != "$val" ]; then
          echo -n " -o orig:mountpoint=\"$val\"";
          echo -n " -o mountpoint=\"$MNTPOINT\"";
        fi
@@ -738,9 +735,7 @@ if [ -z "$DSTMOUNTBASE" -o "$DSTMOUNTBASE" = "none" -o "$DSTMOUNTBASE" = "legacy
       RECVOPT='-F'
       cmd=""
 #      if [ -n "$CREATEMOUNTPOINT" ]; then
-#      if [ -n "$CREATEMOUNTPOINT" ]; then
 #      create_zfsdest ${DSTVOL} ${SRCVOL} ${DSTMNTPOINT}
-#      fi
 #      fi
 
     else
