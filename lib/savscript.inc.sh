@@ -72,14 +72,14 @@ is_excluded() {
       /*)
         [ -s "$excludefrom" ] || return 1
         while [ -n "$testsrc" ]; do
-          grep -q "^${testsrc}$" $excludefrom && return 0
+          grep -q "^${testsrc}$" $excludefrom 2>/dev/null && return 0
           testsrc=${testsrc%/*}
         done
         ;;
       *)
         [ -s "$excludefrom.zfs" ] || return 1
         while [ -n "$testsrc" ] && [ "$testsrc" != "${otestsrc:-nadaquedalle}" ]; do
-          grep -q "^${testsrc%/}$" $excludefrom.zfs && return 0
+          grep -q "^${testsrc%/}$" $excludefrom.zfs 2>/dev/null && return 0
           otestsrc=$testsrc
           testsrc=${testsrc%/*}
         done
@@ -120,7 +120,7 @@ now_exclude() {
           if [ -n "$ZFSFSES" ]; then
               for zfsdesc in $ZFSFSES; do
                   if [ "${zfsdesc%|*}" = "$arg" ]; then
-                      grep -q "^${zfsdesc#*|}$" $excludefrom.zfs 2>/dev/null || echo "${zfsdesc#*|}" >> $excludefrom.zfs
+                      is_excluded "${zfsdesc#*|}" || echo "${zfsdesc#*|}" >> $excludefrom.zfs
                   fi
               done
           fi
@@ -132,7 +132,7 @@ now_exclude() {
               if [ "${zfsdesc#*|}" = "$arg" ]; then
                 echo ${zfsdesc#*|} >> $excludefrom.zfs
                 echo "${zfsdesc%|*}" | grep -q "^/..*" || continue
-                grep -q "^${zfsdesc%|*}$" $excludefrom ||  echo "${zfsdesc%|*}" >> $excludefrom
+                is_excluded "^${zfsdesc%|*}$" ||  echo "${zfsdesc%|*}" >> $excludefrom
                 return 0
               fi
             done
