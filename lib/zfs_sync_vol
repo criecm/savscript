@@ -640,7 +640,7 @@ SYSLOG_ID=${SYSLOG_ID:-user}
 if [ "x$PERSISTSSH" = "xYES" ]; then
   if [ -z "$TMPDIR" ]; then
     export TMPDIR=/var/tmp/sshs
-    mkdir -m 0700 $TMPDIR
+    mkdir -m 0700 -p $TMPDIR
   fi
 fi
 SSHOPTS="-T"${SSHKEY:+" -i $SSHKEY"}${TEMPSSH:+" -oUserKnownHostsFile=${TMPDIR:-/tmp}/kkk -oCheckHostIP=no"}${PERSISTSSH:+" -oControlMaster=auto -oControlPath=$TMPDIR/%C -oControlPersist=yes"}
