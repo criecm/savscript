@@ -706,6 +706,10 @@ if ! src_zfs_list | cut -d'!' -f1 | grep -q '^'${SRCVOL}'$'; then
     erreur "Le volume ${SRCVOL} n'existe pas"
   fi
 fi
+if is_excluded ${SRCVOL}; then
+  inform "le volume ${SRCVOL} est exclus"
+  exit 0
+fi
 
 DSTBASE=$(dst_ro_run "zfs list -H -o mountpoint ${DSTVOL%/*}")
 if ! echo $DSTBASE | grep -q ^/; then
