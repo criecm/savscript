@@ -179,7 +179,7 @@ debug() {
 }
 
 snapshot_dest() {
-  debug "snapshot_dest($*)"
+  syslogue "debug" "snapshot_dest($*)"
   V=$1
   SNAPNAME=${SNAPNAME:-$(TZ=GMT date +GMT-%Y.%m.%d-%H.%M.%S)}
   doit /sbin/zfs snapshot -r $V@$SNAPNAME
