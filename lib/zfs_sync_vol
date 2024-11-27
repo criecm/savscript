@@ -643,7 +643,7 @@ if [ "x$PERSISTSSH" = "xYES" ]; then
     mkdir -m 0700 -p $TMPDIR
   fi
 fi
-SSHOPTS="-T"${SSHKEY:+" -i $SSHKEY"}${TEMPSSH:+" -oUserKnownHostsFile=${TMPDIR:-/tmp}/kkk -oCheckHostIP=no"}${PERSISTSSH:+" -oControlMaster=auto -oControlPath=$TMPDIR/%C -oControlPersist=yes"}
+SSHOPTS="-T"${SSHKEY:+" -i $SSHKEY"}${TEMPSSH:+" -oUserKnownHostsFile=${TMPDIR:-/tmp}/kkk -oCheckHostIP=no"}${PERSISTSSH:+" -oControlMaster=auto -oControlPath=$TMPDIR/%C -oControlPersist=30m"}
 
 # determine source and dest hosts, volumes,...
 SRCHOST=""
