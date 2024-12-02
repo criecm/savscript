@@ -42,7 +42,7 @@ justdoit() {
 if init_srv $DEST; then
     syslogue "info" "($NAME): start"
 
-    syslogue "debug" "($NAME): ZPOOLS=$ZPOOLS ZFSFSES=$ZFSFSES"
+    syslogue "debug" "($NAME): ZPOOLS=$ZPOOLS"
     if [ ! -z "$ZPOOLS" ]; then
         for pool in $ZPOOLS; do
             justdoit zfs_presnap $pool
@@ -62,6 +62,7 @@ if init_srv $DEST; then
                 ZR="$ZRECURSION"
                 ZRECURSION="-R"
                 for o in $IORIGIN; do
+                    syslogue "debug" "($NAME): get iocage origin $o"
                     get_zfs $(get_srcdir_for_zfs $o) $JAILSZFSDEST/${NAME}_${o##*/} $o
                 done
                 ZRECURSION="$ZR"
@@ -74,7 +75,7 @@ if init_srv $DEST; then
             done
         fi
 	if [ ! -z "$IOJAILS" ]; then
-		now_exclude $(get_zfs_src_for /iocage/jails)
+		now_exclude /iocage/jails
 	fi
 	now_exclude ${IORIGIN%%/releases*}/releases
 	now_exclude ${IORIGIN%%/releases*}/download
@@ -103,8 +104,9 @@ if init_srv $DEST; then
     # FULL ZFS SCENARIO
     if [ "$FULLZFS" = "YES" ]; then
         # tout est en ZFS: cool :)
-        for testfs in $ZFSFSES; do
-            is_excluded ${testfs%|*} && now_exclude ${testfs#*|}
+        for testfs in $ZFSLIST; do
+            zfsanddir=${testfs%%|*}
+            is_excluded ${zfsanddir#*|} && now_exclude ${zfsanddir%|*}
         done 
         # si aucune exclusion + c'est le seul zpool, alors on lance en un coup
         #export DONOTEXCLUDEZFS="for now"
@@ -117,13 +119,19 @@ if init_srv $DEST; then
             if [ -n "$ZFSSLASH" ]; then
                 syslogue "debug" "($NAME) ZFSSLASH: get ${ZFSSLASH%%/*}"
                 justdoit get_zfs / $ZFSDEST ${ZFSSLASH%%/*}
+                now_exclude_zfs_only ${ZFSSLASH%%/*}
             fi
-            for fs in $ZFSFSES; do
-                if ! is_excluded ${fs%|*} && ! is_excluded ${fs#*|} && [ "${fs%|*}" != "none" ]; then
-                    justdoit get_zfs ${fs%|*}
+            for fs in $ZFSLIST; do
+                zfsanddir=${fs%|*}
+                zfsopts=${fs#${zfsanddir}|}
+                if ! is_excluded ${zfsanddir%|*} && ! is_excluded ${zfsanddir#*|} && [ "${zfsanddir#*|}" != "none" ] && [ "${zfsopts%/*}" = "yes" ]; then
+                    origzfs=${zfsanddir%|*}
+                    syslogue "debug" "($NAME) zfs loop: $origzfs"
+                    justdoit get_zfs ${zfsanddir#*|} ${ZFSDEST}${zfsanddir#*|} ${origzfs}
                     myret=$(( $myret + $? ))
                 fi
             done
+
         fi
 	# corrige une racine ZFS freebsd (zroot/ROOT/default => /)
 	if [ -n "$ZFSSLASH" ]; then
@@ -172,17 +180,22 @@ if init_srv $DEST; then
                 # UFS: ca peut faire des snapshots, mais pas beaucoup
                 #   on en fait un pour le rsync, puis on le detruit
                 ufs)
-                    justdoit get_ufs $dir
+                    justdoit get_ufs $dir $DESTDIR/${dir#/} $ZFSDEST${dir%/}
                     myret=$(( $myret + $? ))
                 ;;
                 # ZFS a son script qui fait tout ca tres bien (snapshot a la source)
                 zfs)
-                    justdoit get_zfs $dir
+                    if [ "$dir" = "/" ]; then
+                        [ -z "$ZFSSLASH" ] && syslogue "warning" "ZFS / but \$ZFSSLASH empty ??? skipping" && continue
+                        justdoit get_zfs $dir $ZFSDEST $ZFSSLASH
+                    else
+                        justdoit get_zfs $dir $ZFSDEST/${dir#/} $(get_zfs_src_for $dir)
+                    fi
                     myret=$(( $myret + $? ))
                 ;;
                 # ext[234], autres: un simple rsync + snapshot
                 *)
-                    justdoit get_fs $dir
+                    justdoit get_fs $dir $DESTDIR/${dir#/} $ZFSDEST${dir%/}
                     myret=$(( $myret + $? ))
                 ;;
                 esac
