@@ -148,26 +148,6 @@ if init_srv $DEST; then
                 fi
             fi
         fi
-        # modification des points de montage si besoin (protection du systeme local !)
-        zfs list -H -o mountpoint,name,jailed -r $ZFSDEST | awk '($1 !~ /^'$(echo $DESTDIR|sed 's@/@\\/@g')'/ && $1 ~ /^\// && $3 ~ /off/) { rel=$1; gsub("^/$","",rel); printf("zfs set mountpoint='$DESTDIR'%s %s; zfs set orig:mountpoint=%s %s;\n",rel,$2,$1,$2); }' > $TRACES/$NAME.corrections_montages.sh 2>> $TRACES/$NAME.corrections_montages.log
-        if [ -s $TRACES/$NAME.corrections_montages.sh ]; then
-            justdoit shellex $TRACES/$NAME.corrections_montages.sh >> $TRACES/$NAME.corrections_montages.log 2>&1
-            myret=$?
-            myret=$(($myret + $(grep -v '^+' $TRACES/$NAME.corrections_montages.log | wc -l)))
-            [ $myret -eq 0 ] || MOUNTPROBLEM="YES"
-            warn_admin $myret "FULLZFS:correction_montages" "$TRACES/$NAME.corrections_montages.sh" "Certains points de montages dangereux ${MOUNTPROBLEM:+non }corriges ${MOUNTPROBLEM:+\!}"
-        fi
-        # remontage dans l'ordre si / a un mountpoint 'legacy' (monte par fstab) ou canmount=noauto (nouvelle methode)
-        if [ -n "$ZFSSLASH" ] && [ -z "$MOUNTPROBLEM" ]; then
-            syslogue "info" "($NAME) FULLZFS: remontage dans l'ordre (racine en ZFS)"
-            zfs list -H -o canmount,mountpoint,name,mounted -S name -r $ZFSDEST | awk '($1 ~ /^on$/ && $2 ~ /^\// && $4 ~ /^yes$/) { print $3 }' | xargs -L1 zfs umount
-            mount | grep '^'$ZFSDEST'.* on '$DESTDIR | awk '{print $1}' | sort -r | xargs -L1 umount -f || mount -tzfs | grep '^'$ZFSDEST'.* on '$DESTDIR
-            mount -tzfs $ZFSDEST/${ZFSSLASH#*/} $DESTDIR
-            zfs list -H -o canmount,jailed,mountpoint,name -r $ZFSDEST | awk '($1 ~ /^on$/ && $2 !~ /^on$/ && $3 ~ /^\// && $3 ~ /'$(echo $DESTDIR|sed 's@/@\\/@g')'/) { print $4 }' | while read z; do
-                mount | grep -q "^$z " || zfs mount $z
-            done
-        fi
-
     # AUTRES/MIXED FS SCENARIO
     else
         allret=0
@@ -213,6 +193,26 @@ if init_srv $DEST; then
           syslogue "notice" "($NAME) done with warnings :-/"
         fi
     fi
+    # modification des points de montage si besoin (protection du systeme local !)
+    zfs list -H -o mountpoint,name,jailed -r $ZFSDEST | awk '($1 !~ /^'$(echo $DESTDIR|sed 's@/@\\/@g')'/ && $1 ~ /^\// && $3 ~ /off/) { rel=$1; gsub("^/$","",rel); printf("zfs set mountpoint='$DESTDIR'%s %s; zfs set orig:mountpoint=%s %s;\n",rel,$2,$1,$2); }' > $TRACES/$NAME.corrections_montages.sh 2>> $TRACES/$NAME.corrections_montages.log
+    if [ -s $TRACES/$NAME.corrections_montages.sh ]; then
+        justdoit shellex $TRACES/$NAME.corrections_montages.sh >> $TRACES/$NAME.corrections_montages.log 2>&1
+        myret=$?
+        myret=$(($myret + $(grep -v '^+' $TRACES/$NAME.corrections_montages.log | wc -l)))
+        [ $myret -eq 0 ] || MOUNTPROBLEM="YES"
+        warn_admin $myret "FULLZFS:correction_montages" "$TRACES/$NAME.corrections_montages.sh" "Certains points de montages dangereux ${MOUNTPROBLEM:+non }corriges ${MOUNTPROBLEM:+\!}"
+    fi
+    # remontage dans l'ordre si / a un mountpoint 'legacy' (monte par fstab) ou canmount=noauto (nouvelle methode)
+    if [ -n "$ZFSSLASH" ] && [ -z "$MOUNTPROBLEM" ]; then
+        syslogue "info" "($NAME) FULLZFS: remontage dans l'ordre (racine en ZFS)"
+        zfs list -H -o canmount,mountpoint,name,mounted -S name -r $ZFSDEST | awk '($1 ~ /^on$/ && $2 ~ /^\// && $4 ~ /^yes$/) { print $3 }' | xargs -L1 zfs umount
+        mount | grep '^'$ZFSDEST'.* on '$DESTDIR | awk '{print $1}' | sort -r | xargs -L1 umount -f || mount -tzfs | grep '^'$ZFSDEST'.* on '$DESTDIR
+        mount -tzfs $ZFSDEST/${ZFSSLASH#*/} $DESTDIR
+        zfs list -H -o canmount,jailed,mountpoint,name -r $ZFSDEST | awk '($1 ~ /^on$/ && $2 !~ /^on$/ && $3 ~ /^\// && $3 ~ /'$(echo $DESTDIR|sed 's@/@\\/@g')'/) { print $4 }' | while read z; do
+            mount | grep -q "^$z " || zfs mount $z
+        done
+    fi
+
     [ "$SNAP_AFTER" = "YES" ] && justdoit snapshot_dest $ZFSDEST
     justdoit cleanup_srv
     exit $allret
