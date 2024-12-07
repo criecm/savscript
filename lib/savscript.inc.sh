@@ -612,6 +612,7 @@ get_ufs() {
 
 # usage: get_zfs srcdir dstvol srcvol
 get_zfs() {
+    [ $# -ne 3 ] && return 1
     if [ "$1" = "legacy" ]; then
         return
     fi
