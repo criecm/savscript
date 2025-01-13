@@ -117,28 +117,38 @@ now_exclude() {
         /*)
           syslogue "debug" "now_exclude($arg): path"
           echo "$arg" >> $excludefrom
-          if [ -n "$ZFSFSES" ]; then
-              for zfsdesc in $ZFSFSES; do
-                  if [ "${zfsdesc%|*}" = "$arg" ]; then
-                      is_excluded "${zfsdesc#*|}" || echo "${zfsdesc#*|}" >> $excludefrom.zfs
+          if [ -n "$ZFSLIST" ]; then
+              for zfsdesc in $ZFSLIST; do
+                  local zfsmntpoint="${zfsdesc%|*}"
+                  zfsmntpoint=${zfsmntpoint#*|}
+                  if [ "${zfsmntpoint}" = "$arg" ]; then
+                      is_excluded "${zfsdesc%%|*}" || echo "${zfsdesc%%|*}" >> $excludefrom.zfs
                   fi
               done
           fi
           ;;
         *)
           syslogue "debug" "now_exclude($arg): ZFS"
-          if [ -n "$ZFSFSES" ]; then
-            for zfsdesc in $ZFSFSES; do
-              if [ "${zfsdesc#*|}" = "$arg" ]; then
-                echo ${zfsdesc#*|} >> $excludefrom.zfs
-                echo "${zfsdesc%|*}" | grep -q "^/..*" || continue
-                is_excluded "^${zfsdesc%|*}$" ||  echo "${zfsdesc%|*}" >> $excludefrom
+          if [ -n "$ZFSLIST" ]; then
+            for zfsdesc in $ZFSLIST; do
+              if [ "${zfsdesc%%|*}" = "$arg" ]; then
+                echo ${arg} >> $excludefrom.zfs
+                local srcdir_for=$(get_srcdir_for_zfs ${arg})
+                echo "${zfsdesc%|*}" | grep -q "^[^\|]*|/..*|" || continue
+                is_excluded "${srcdir_for}" ||  echo "${srcdir_for}" >> $excludefrom
                 return 0
               fi
             done
           fi
           ;;
       esac
+    done
+}
+
+now_exclude_zfs_only() {
+    for arg in $*; do
+        is_excluded "$arg" && return 0
+        echo ${arg} >> $excludefrom.zfs
     done
 }
 
@@ -212,7 +222,7 @@ srvinfos=$DESTDIR.infos
 # - SYSVER (uname -r)
 # - FSLIST (liste de fstype:/montage)
 # - RSYNC_SRV_PID si un demon rsync a pu etre lance sur $RSYNC_PORT
-# - ZFSFSES (zfs filesystems)
+# - ZFSLIST (zfs filesystems)
 # - ZPOOLS (pools zfs)
 # - ZFSSLASH (racine ZFS si 'legacy')
 # si FreeBSD:
@@ -244,11 +254,7 @@ fi
 if [ \$(mount -t zfs | wc -l) -gt 0 ]; then
   echo ZPOOLS=\\\"\$(/sbin/zpool list -H -o name)\\\";
   echo ZFSSLASH=\\\"\$(zfs list -H -omountpoint,name / | awk '{print \$2}')\\\";
-  if [ \"\$(uname -s)\" = \"FreeBSD\" ]; then
-    echo ZFSFSES=\\\"\$(zfs list -H -t filesystem -o jailed,name,mountpoint | grep -v '^on.*none' | awk '/^on/{j=\$2;gsub(\"^.*jails/\",\"\",j);gsub(\"/.*\$\",\"\",j); printf(\"/iocage/jails/%s/root%s|%s\\\n\",j,\$3,\$2)}/^off/{printf(\"%s|%s\\\n\",\$3,\$2);}')\\\";
-  else
-    echo ZFSFSES=\\\"\$(zfs list -H -t filesystem -o name,mountpoint | awk '{printf(\"%s|%s\\\n\",\$2,\$1);}')\\\";
-  fi
+  echo ZFSLIST=\\\"\$(zfs list -H -oname,mountpoint,mounted,canmount | awk '{printf(\"%s|%s|%s/%s\\\n\",\$1,\$2,\$3,\$4);}')\\\";
 fi
 if [ \"\$(uname -s)\" = \"Linux\" ] && [ -e \"/etc/pve/local\" ]; then
   echo PVECLUSTER=\\\"\$(pvecm status|grep ^Name: | awk '{print \$NF}')\\\"
@@ -293,7 +299,7 @@ fi" > $srvinfos 2> $TRACES/$NAME.init_srv
             esac
         done
         # si ZFS a la source
-        if [ ! -z "$ZFSFSES" ]; then
+        if [ ! -z "$ZFSLIST" ]; then
             if [ ! -x "$ZFS_SYNC_VOL" ]; then
                 warn_admin 1 "init_srv($*)" "" "Impossible de trouver zfs_sync_vol dans $PATH \!"
                 return 1
@@ -310,7 +316,7 @@ fi" > $srvinfos 2> $TRACES/$NAME.init_srv
                     pools=""
                     for pool in $ZPOOLS; do
                         if ! is_excluded $pool; then
-                            npools=$(( $npools+1 ))
+                            npools=$(( npools+1 ))
                             pools="$pools $pool"
                         fi
                     done
@@ -321,7 +327,7 @@ fi" > $srvinfos 2> $TRACES/$NAME.init_srv
                     fi
                 fi
                 echo "ONEZPOOL=$ONEZPOOL" >> $srvinfos
-                echo "ZPOOLS=$ZPOOLS" >> $srvinfos
+                echo "ZPOOLS=\"$ZPOOLS\"" >> $srvinfos
                 echo "FULLZFS=$FULLZFS" >> $srvinfos
             fi
         fi
@@ -461,12 +467,13 @@ get_zfsdest_for() {
 
 # renvoie le chemin ZFS de la source pour un repertoire
 get_zfs_src_for() {
-    for zfsdesc in $ZFSFSES; do
-        if [ "$1" = "${zfsdesc%|*}" ]; then
-            echo "${zfsdesc#*|}"
-            return
-        elif [ "$1" = "${zfsdesc#*|}" ]; then
-            echo "${zfsdesc#*|}"
+    syslogue "debug" "get_zfs_src_for($1) => ?)"
+    for zfsdesc in $ZFSLIST; do
+        zfsanddir=${zfsdesc%|*}
+        zfsopts=${zfsdesc#${zfsanddir}|}
+        if [ "${1}" = "${zfsanddir#*|}" ] && [ "${zfsopts%/*}" = "yes" ]; then
+            echo "${zfsdesc%%|*}"
+            syslogue "debug" "get_zfs_src_for($1) => ${zfsdesc%%|*})"
             return
         fi
     done
@@ -475,9 +482,13 @@ get_zfs_src_for() {
 
 # renvoie le chemin sur la source pour un volume ZFS source
 get_srcdir_for_zfs() {
-    for zfsdesc in $ZFSFSES; do
-        if [ "$1" = "${zfsdesc#*|}" ]; then
-            echo ${zfsdesc%|*}
+    syslogue "debug" "get_srcdir_for_zfs($1) => ?)"
+    for zfsdesc in $ZFSLIST; do
+        zfsanddir=${zfsdesc%|*}
+        zfsopts=${zfsdesc#${zfsanddir}|}
+        if [ "${1}" = "${zfsanddir%|*}" ] && [ "${zfsopts%/*}" = "yes" ]; then
+            echo ${zfsdesc} | cut -d'|' -f2
+            syslogue "debug" "get_srcdir_for_zfs($1) => $(echo ${zfsdesc} | cut -d'|' -f2)"
             return
         fi
     done
@@ -485,15 +496,15 @@ get_srcdir_for_zfs() {
 }
 
 # creation d'un volume ZFS si besoin, verification du montage
-# usage: init_zfs_dest <srcdir> [dstdir] [zfsdst]
+# usage: init_zfs_dest <srcdir> <dstdir> <zfsdst>
 # cree les variable:
 #   $mydestdir (rep de sauvegarde pour ce chemin)
 #   $myzfsdest (vol zfs correspondant)
 init_zfs_dest() {
-    mydir=$1
-    L=$TRACES/$NAME.init_zfs_dest.$(echo $1 | sed 's@/@_@g')
-    mydestdir=${2:-$(get_destdir_for $mydir)}
-    myzfsdest=${3:-$(get_zfsdest_for $mydir)}
+    [ $# -ne 3 ] && exit 1
+    mydir=${1}
+    mydestdir=${2}
+    myzfsdest=${3}
     # creer le vol zfs dest si besoin et le remplir de ce qu'on avait avant dans le meme repertoire
     if ! zfs list -H -o name $myzfsdest >/dev/null 2>&1; then
         if [ -d $mydestdir ]; then
@@ -515,13 +526,6 @@ init_zfs_dest() {
         done
         zfs create -o orig:mountpoint=$mydir $myzfsdest
 
-#        if [ -d $mydestdir.tmp ]; then
-#            cd $mydestdir.tmp 2>> $L && \
-#            doit pax -rw -X -pe . $mydestdir 2>> $L && \
-#            cd - >/dev/null 2>> $L&& \
-#            doit nohup rm -rf $mydestdir.tmp > $L 2>&1 &
-#            warn_admin 0 "init_zfs_dest($*)" "$L" "Le contenu de $mydestdir.tmp a ete deplace dans le volume ZFS $mydestdir :)"
-#        fi
     else
         # verifier que la destination est bien montee
         mount | grep -q ^$myzfsdest' ' && doit zfs umount $myzfsdest
@@ -540,10 +544,14 @@ init_zfs_dest() {
 ### Filesystems sources ###
 ###########################
 # generique: rsync 'simple'
+# usage: get_fs srcdir dstdir zfsdest
 get_fs() {
+    [ $# -ne 3 ] && exit 1
     dir=$1
+    local mydestdir=$2
+    local myzfsdest=$3
     say_begin "$dir"
-    init_zfs_dest $dir $2 $3
+    init_zfs_dest $dir $mydestdir $myzfsdest
     L=$TRACES/$NAME.get_fs.$(echo $1 | sed 's@/@_@g')
     rsync_it ${dir%/}/ $mydestdir/ $L
     ret=$?
@@ -554,9 +562,12 @@ get_fs() {
     say_end_with $ret
 }
 
-# usage: get_ufs srcdir [[dstdir] [zfsdest]]
+# usage: get_ufs srcdir dstdir zfsdest
 get_ufs() {
+    [ $# -ne 3 ] && exit 1
     dir=$1
+    local mydestdir=$2
+    local myzfsdest=$3
     say_begin "UFS:$dir"
     L=$TRACES/$NAME.get_ufs.$(echo $1 | sed 's@/@_@g')
     UFSSNAPNAME=rsync.$(date +%Y%m%d-%H%M%S)
@@ -579,7 +590,7 @@ get_ufs() {
               fi; \
             fi" 2>>$L ) >> $L
     fi
-    init_zfs_dest $dir $2 $3
+    init_zfs_dest $dir $mydestdir $myzfsdest
     if [ ! -z "$UFSTS" ]; then
         rsync_it ${UFSMOUNTDIR}/ $mydestdir/ $L
         ret=$?
@@ -599,15 +610,16 @@ get_ufs() {
     say_end_with $ret
 }
 
-# usage: get_zfs srcdir [dstvol] [srcvol]
+# usage: get_zfs srcdir dstvol srcvol
 get_zfs() {
+    [ $# -ne 3 ] && return 1
     if [ "$1" = "legacy" ]; then
         return
     fi
     local ret=0
 #    echo "get_zfs $*" >> /tmp/$(echo "$DEST $*" | sed 's/[^-a-zA-Z0-9]/_/g')
     ztarget=$1
-    d=${2:-$(get_zfsdest_for $ztarget)}
+    d=${2}
     if [ ! -z "$d" ]; then
         if ! [ -n "$(zfs list -H -oname ${d%/*})" ]; then
             if ! zfs create -o canmount=off ${d%/*} 2>/dev/null; then
@@ -627,7 +639,7 @@ get_zfs() {
             fi
         fi
     fi
-    s=${3:-$(get_zfs_src_for $ztarget)}
+    s=${3}
     dm=$(get_destdir_for $ztarget)
     if is_excluded $s; then
       debug "$s excluded"
@@ -680,7 +692,7 @@ get_zfs() {
     # TEMP: reverse ca: readonly s'herite
     #zfs get -H -o name,source -t filesystem -r readonly ${d} | grep -v '^'${d}'	' | cut -f 1 | xargs -L1 zfs inherit readonly
     zfs get -H -o name,value -t filesystem readonly ${d} | grep -q 'off$' && zfs set readonly=on ${d}
-    #[ -n "$DONOTEXCLUDEZFS" ] || now_exclude $s
+    [ -n "$DONOTEXCLUDEZFS" ] || now_exclude_zfs_only $s
     say_end_with $ret
 }
 
@@ -703,14 +715,14 @@ is_fstype() {
 is_iojail() {
     [ -z "$IOJAILS" ] && return 1
     echo $1 | fgrep -q iocage || return 1
-    UUID=${1%/root}
+    UUID=${1%/root*}
     UUID=${UUID#/iocage/jails/}
     [ -z "$UUID" ] && return 1
     # name-based iocage (0.9.9+) (UUID is name)
     curjail=${UUID}
-    curjailsrc=$(get_zfs_src_for $1 | sed 's@/root$@@')
-    curjaildir=${1%/root}
+    curjaildir="/iocage/jails/${UUID}"
     curjailroot="${curjaildir}/root"
+    curjailsrc=$(get_zfs_src_for $curjaildir)
 #echo "iocage 0.9.9+ curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
     return 0
 }
@@ -727,8 +739,8 @@ is_jailed() {
            is_iojail $test && return 0
            curjail=${j##*/}
            curjaildir=${j}
-           curjailsrc=$(get_zfs_src_for $curjaildir | sed 's@/root$@@')
            curjailroot=${j}
+           curjailsrc=$(get_zfs_src_for $curjaildir)
            return 0
        fi
     done
@@ -756,7 +768,7 @@ get_jail() {
     local ret=0
     local cret=0
     if is_iojail $jaildir; then
-syslogue "debug" "iocage curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
+        syslogue "debug" "iocage curjail=$curjail curjaildir=$curjaildir curjailsrc=$curjailsrc"
         get_zfs ${curjaildir} $JAILSZFSDEST/$curjail ${curjailsrc}
         ret=$?
         now_exclude ${curjailsrc}

@@ -42,7 +42,7 @@ justdoit() {
 if init_srv $DEST; then
     syslogue "info" "($NAME): start"
 
-    syslogue "debug" "($NAME): ZPOOLS=$ZPOOLS ZFSFSES=$ZFSFSES"
+    syslogue "debug" "($NAME): ZPOOLS=$ZPOOLS"
     if [ ! -z "$ZPOOLS" ]; then
         for pool in $ZPOOLS; do
             justdoit zfs_presnap $pool
@@ -62,6 +62,7 @@ if init_srv $DEST; then
                 ZR="$ZRECURSION"
                 ZRECURSION="-R"
                 for o in $IORIGIN; do
+                    syslogue "debug" "($NAME): get iocage origin $o"
                     get_zfs $(get_srcdir_for_zfs $o) $JAILSZFSDEST/${NAME}_${o##*/} $o
                 done
                 ZRECURSION="$ZR"
@@ -74,7 +75,7 @@ if init_srv $DEST; then
             done
         fi
 	if [ ! -z "$IOJAILS" ]; then
-		now_exclude $(get_zfs_src_for /iocage/jails)
+		now_exclude /iocage/jails
 	fi
 	now_exclude ${IORIGIN%%/releases*}/releases
 	now_exclude ${IORIGIN%%/releases*}/download
@@ -103,8 +104,9 @@ if init_srv $DEST; then
     # FULL ZFS SCENARIO
     if [ "$FULLZFS" = "YES" ]; then
         # tout est en ZFS: cool :)
-        for testfs in $ZFSFSES; do
-            is_excluded ${testfs%|*} && now_exclude ${testfs#*|}
+        for testfs in $ZFSLIST; do
+            zfsanddir=${testfs%%|*}
+            is_excluded ${zfsanddir#*|} && now_exclude ${zfsanddir%|*}
         done 
         # si aucune exclusion + c'est le seul zpool, alors on lance en un coup
         #export DONOTEXCLUDEZFS="for now"
@@ -117,13 +119,19 @@ if init_srv $DEST; then
             if [ -n "$ZFSSLASH" ]; then
                 syslogue "debug" "($NAME) ZFSSLASH: get ${ZFSSLASH%%/*}"
                 justdoit get_zfs / $ZFSDEST ${ZFSSLASH%%/*}
+                now_exclude_zfs_only ${ZFSSLASH%%/*}
             fi
-            for fs in $ZFSFSES; do
-                if ! is_excluded ${fs%|*} && ! is_excluded ${fs#*|} && [ "${fs%|*}" != "none" ]; then
-                    justdoit get_zfs ${fs%|*}
+            for fs in $ZFSLIST; do
+                zfsanddir=${fs%|*}
+                zfsopts=${fs#${zfsanddir}|}
+                if ! is_excluded ${zfsanddir%|*} && ! is_excluded ${zfsanddir#*|} && [ "${zfsanddir#*|}" != "none" ] && [ "${zfsopts%/*}" = "yes" ]; then
+                    origzfs=${zfsanddir%|*}
+                    syslogue "debug" "($NAME) zfs loop: $origzfs"
+                    justdoit get_zfs ${zfsanddir#*|} ${ZFSDEST}${zfsanddir#*|} ${origzfs}
                     myret=$(( $myret + $? ))
                 fi
             done
+
         fi
 	# corrige une racine ZFS freebsd (zroot/ROOT/default => /)
 	if [ -n "$ZFSSLASH" ]; then
@@ -140,26 +148,6 @@ if init_srv $DEST; then
                 fi
             fi
         fi
-        # modification des points de montage si besoin (protection du systeme local !)
-        zfs list -H -o mountpoint,name,jailed -r $ZFSDEST | awk '($1 !~ /^'$(echo $DESTDIR|sed 's@/@\\/@g')'/ && $1 ~ /^\// && $3 ~ /off/) { rel=$1; gsub("^/$","",rel); printf("zfs set mountpoint='$DESTDIR'%s %s; zfs set orig:mountpoint=%s %s;\n",rel,$2,$1,$2); }' > $TRACES/$NAME.corrections_montages.sh 2>> $TRACES/$NAME.corrections_montages.log
-        if [ -s $TRACES/$NAME.corrections_montages.sh ]; then
-            justdoit shellex $TRACES/$NAME.corrections_montages.sh >> $TRACES/$NAME.corrections_montages.log 2>&1
-            myret=$?
-            myret=$(($myret + $(grep -v '^+' $TRACES/$NAME.corrections_montages.log | wc -l)))
-            [ $myret -eq 0 ] || MOUNTPROBLEM="YES"
-            warn_admin $myret "FULLZFS:correction_montages" "$TRACES/$NAME.corrections_montages.sh" "Certains points de montages dangereux ${MOUNTPROBLEM:+non }corriges ${MOUNTPROBLEM:+\!}"
-        fi
-        # remontage dans l'ordre si / a un mountpoint 'legacy' (monte par fstab) ou canmount=noauto (nouvelle methode)
-        if [ -n "$ZFSSLASH" ] && [ -z "$MOUNTPROBLEM" ]; then
-            syslogue "info" "($NAME) FULLZFS: remontage dans l'ordre (racine en ZFS)"
-            zfs list -H -o canmount,mountpoint,name,mounted -S name -r $ZFSDEST | awk '($1 ~ /^on$/ && $2 ~ /^\// && $4 ~ /^yes$/) { print $3 }' | xargs -L1 zfs umount
-            mount | grep '^'$ZFSDEST'.* on '$DESTDIR | awk '{print $1}' | sort -r | xargs -L1 umount -f || mount -tzfs | grep '^'$ZFSDEST'.* on '$DESTDIR
-            mount -tzfs $ZFSDEST/${ZFSSLASH#*/} $DESTDIR
-            zfs list -H -o canmount,jailed,mountpoint,name -r $ZFSDEST | awk '($1 ~ /^on$/ && $2 !~ /^on$/ && $3 ~ /^\// && $3 ~ /'$(echo $DESTDIR|sed 's@/@\\/@g')'/) { print $4 }' | while read z; do
-                mount | grep -q "^$z " || zfs mount $z
-            done
-        fi
-
     # AUTRES/MIXED FS SCENARIO
     else
         allret=0
@@ -172,17 +160,22 @@ if init_srv $DEST; then
                 # UFS: ca peut faire des snapshots, mais pas beaucoup
                 #   on en fait un pour le rsync, puis on le detruit
                 ufs)
-                    justdoit get_ufs $dir
+                    justdoit get_ufs $dir $DESTDIR/${dir#/} $ZFSDEST${dir%/}
                     myret=$(( $myret + $? ))
                 ;;
                 # ZFS a son script qui fait tout ca tres bien (snapshot a la source)
                 zfs)
-                    justdoit get_zfs $dir
+                    if [ "$dir" = "/" ]; then
+                        [ -z "$ZFSSLASH" ] && syslogue "warning" "ZFS / but \$ZFSSLASH empty ??? skipping" && continue
+                        justdoit get_zfs $dir $ZFSDEST $ZFSSLASH
+                    else
+                        justdoit get_zfs $dir $ZFSDEST/${dir#/} $(get_zfs_src_for $dir)
+                    fi
                     myret=$(( $myret + $? ))
                 ;;
                 # ext[234], autres: un simple rsync + snapshot
                 *)
-                    justdoit get_fs $dir
+                    justdoit get_fs $dir $DESTDIR/${dir#/} $ZFSDEST${dir%/}
                     myret=$(( $myret + $? ))
                 ;;
                 esac
@@ -200,6 +193,26 @@ if init_srv $DEST; then
           syslogue "notice" "($NAME) done with warnings :-/"
         fi
     fi
+    # modification des points de montage si besoin (protection du systeme local !)
+    zfs list -H -o mountpoint,name,jailed -r $ZFSDEST | awk '($1 !~ /^'$(echo $DESTDIR|sed 's@/@\\/@g')'/ && $1 ~ /^\// && $3 ~ /off/) { rel=$1; gsub("^/$","",rel); printf("zfs set mountpoint='$DESTDIR'%s %s; zfs set orig:mountpoint=%s %s;\n",rel,$2,$1,$2); }' > $TRACES/$NAME.corrections_montages.sh 2>> $TRACES/$NAME.corrections_montages.log
+    if [ -s $TRACES/$NAME.corrections_montages.sh ]; then
+        justdoit shellex $TRACES/$NAME.corrections_montages.sh >> $TRACES/$NAME.corrections_montages.log 2>&1
+        myret=$?
+        myret=$(($myret + $(grep -v '^+' $TRACES/$NAME.corrections_montages.log | wc -l)))
+        [ $myret -eq 0 ] || MOUNTPROBLEM="YES"
+        warn_admin $myret "FULLZFS:correction_montages" "$TRACES/$NAME.corrections_montages.sh" "Certains points de montages dangereux ${MOUNTPROBLEM:+non }corriges ${MOUNTPROBLEM:+\!}"
+    fi
+    # remontage dans l'ordre si / a un mountpoint 'legacy' (monte par fstab) ou canmount=noauto (nouvelle methode)
+    if [ -n "$ZFSSLASH" ] && [ -z "$MOUNTPROBLEM" ]; then
+        syslogue "info" "($NAME) FULLZFS: remontage dans l'ordre (racine en ZFS)"
+        zfs list -H -o canmount,mountpoint,name,mounted -S name -r $ZFSDEST | awk '($1 ~ /^on$/ && $2 ~ /^\// && $4 ~ /^yes$/) { print $3 }' | xargs -L1 zfs umount
+        mount | grep '^'$ZFSDEST'.* on '$DESTDIR | awk '{print $1}' | sort -r | xargs -L1 umount -f || mount -tzfs | grep '^'$ZFSDEST'.* on '$DESTDIR
+        mount -tzfs $ZFSDEST/${ZFSSLASH#*/} $DESTDIR
+        zfs list -H -o canmount,jailed,mountpoint,name -r $ZFSDEST | awk '($1 ~ /^on$/ && $2 !~ /^on$/ && $3 ~ /^\// && $3 ~ /'$(echo $DESTDIR|sed 's@/@\\/@g')'/) { print $4 }' | while read z; do
+            mount | grep -q "^$z " || zfs mount $z
+        done
+    fi
+
     [ "$SNAP_AFTER" = "YES" ] && justdoit snapshot_dest $ZFSDEST
     justdoit cleanup_srv
     exit $allret
