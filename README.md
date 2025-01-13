@@ -4,37 +4,20 @@
 
 ## Features
 
-- agent-less (ssh, /bin/sh, rsync or zfs)
-- /bin/sh scripted
-- server on FreeBSD/ZFS (may work elsewhere)
+- agent-less (only ssh, /bin/sh, rsync and/or zfs required on clients)
+- backup server initiate the backup - does not have to be accessible from clients
+- using UFS snapshots for consistent backups on FreeBSD
+- /bin/sh script (can run on any bourne shell)
+- server on FreeBSD/ZFS (may work elsewhere but untested)
 - clients tested: Linux/OpenBSD/FreeBSD (any unix-like OS should work)
-- FreeBSD jails can be saved apart (and not depend on their host)
+- FreeBSD jails can be saved apart (and not depend on their host for restauration)
+- proxmox: VM's can be saved apart (with local disks on proxmox)
+- ZFS-powered: keep snapshot(s) for each backup session
 
 ## Dependencies
-- rsync for any non-zfs client
+- rsync for any non-zfs filesystem
 - fping
 - mutt for reporting
 - mbuffer advised (not mandatory)
 - root access on clients, with ssh key only
-
-## HOWTO
-
-### new backup server
-1. git clone this
-2. Create a new ssh key pair only for backups, this key will be authorized from this host only
-
-  `ssh-keygen -C "savscript@$(hostname -s)" -N '' -f id_sav`
-
-3. copy savscript.conf.dist to savscript.conf
-4. edit savscript.conf (`SSH_KEY`,`SAVDIR`, …)
-5. add a client and test
-6. add to crontab
-
-  `32 23 * * *	root	/path/to/savscript.sh`
- 
-
-### new client
-1. use `./tools/nouvelle_machine.sh my.client` to create a config file in machines.d/ and deploy ssh key on clients
-2. launch `./savscript.sh` (with `-v` if needed)
-
 
