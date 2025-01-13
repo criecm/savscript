@@ -764,7 +764,7 @@ echo $DSTMOUNTBASE | grep -q '^/[a-zA-Z0-9]' || echo $DSTMOUNTBASE | grep -q '\(
 # check for dangerous new fixed mountpoints on source for new volumes
 for fs in $(grep '!\(local\|received\)$' $SRCZFSLIST.mounts | cut -d'!' -f1 | sed 's|'${SRCVOL}'|'${DSTVOL}'|'); do
   dst_zfs_list | grep '^'$fs'!' | grep -v '!on$' | grep -v '!off!o[nf]*$' | cut -d'!' -f2 | while read dstmountpoint; do
-    expr "$mountpoint" : "/*" > /dev/null || continue
+    expr "$dstmountpoint" : "/*" > /dev/null || continue
     if ! echo "$dstmountpoint" | grep -q "^$DSTMOUNTBASE" && [ -z "$CORRECTMOUNTS" -a -z "$DSTREMOUNTORIG" ]; then
       erreur "DANGEROUS: some mountpoints out of $DSTMOUNTBASE (and no -U !)"
     fi
