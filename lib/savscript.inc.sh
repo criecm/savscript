@@ -18,6 +18,7 @@ if [ $DEBUG -ge 4 ]; then
     ZOPTS=$ZOPTS" -vv"
     doit() {
         syslogue "debug" "($NAME) DID NOT(DEBUG): $*"
+        return 0
     }
     shellex() {
         doit /bin/sh -x $@
@@ -524,7 +525,7 @@ init_zfs_dest() {
         for zc in $ztocreate; do
             doit zfs create -o canmount=off -o orig:mountpoint=none -o orig:canmount=off $zc
         done
-        zfs create -o orig:mountpoint=$mydir $myzfsdest
+        doit zfs create -o orig:mountpoint=$mydir $myzfsdest
 
     else
         # verifier que la destination est bien montee
@@ -534,7 +535,7 @@ init_zfs_dest() {
             doit zfs set orig:mountpoint=$1 $myzfsdest
         fi
         if [ "$(zfs get -H -o value readonly ${myzfsdest})" != "off" ]; then
-            zfs set readonly=off $myzfsdest
+            doit zfs set readonly=off $myzfsdest
         fi
         doit zfs mount $myzfsdest
     fi
@@ -622,17 +623,27 @@ get_zfs() {
     d=${2}
     if [ ! -z "$d" ]; then
         if ! [ -n "$(zfs list -H -oname ${d%/*})" ]; then
-            if ! zfs create -o canmount=off ${d%/*} 2>/dev/null; then
-                    syslogue "info" "get_zfs(${1}): unable to create ${d%/*}"
+            syslogue "debug" "get_zfs($1): missing parent zfs ${d%/*}"
+            miss="${d%/*}"
+            sd="${d%/*}"
+            while ! zfs list -Honame ${sd%/*} > /dev/null 2>&1; do
+                miss=${sd%/*}" "${miss}
+                sd="${sd%/*}"
+            done
+            for emptyzfs in ${miss}; do
+                syslogue "debug" "get_zfs($1): create parent zfs ${emptyzfs}"
+                if ! doit zfs create -o canmount=off ${emptyzfs} 2>/dev/null; then
+                    syslogue "info" "get_zfs(${1}): unable to create ${emptyzfs}"
                     return 1
-            fi
+                fi
+            done
         fi
         # we may transfer a whole zpool with ROOT/default / ?
         if [ "$ztarget" = "/" ] && echo "$d" | fgrep -q "/ROOT/[^/]"; then
             syslogue "debug" "ROOT/* / zfs"
             d=$ZFSDEST
             if ! zfs list -H -oname ${d} > /dev/null 2>&1; then
-                if ! zfs create -o canmount=off ${d}; then
+                if ! doit zfs create -o canmount=off ${d}; then
                     syslogue "info" "get_zfs(${1}): unable to create ${d%/*}"
                     return 1
                 fi
