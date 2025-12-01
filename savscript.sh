@@ -158,7 +158,7 @@ else
   TOTALS=$(($(date +%s) - $TBEGINALL))
   syslogue "info" "savscript: THE END ($(($TOTALS / 3600))h$(($TOTALS % 3600 / 60))m$(($TOTALS % 3600 % 60))s)"
 fi
-if [ -s $TRACES/msg ]; then
+if [ -s $TRACES/msg ] && grep -q '^[a-z0-9]*:' $TRACES/msg; then
   if [ ! -z "$ADMINMAIL" ]; then
     TRACES_A_ENVOYER=$(grep "see " $TRACES/msg | sed 's/^.*see \(.*\)$/\1/')
     SERVEURS_A_PB=$(grep '^[a-z0-9]*:' $TRACES/msg | cut -d: -f1 | sort -u | tr '\n' ' ')
