@@ -60,6 +60,7 @@ echo SYSTEM=$SYSTEM
 echo EXCLUDES="$EXCLUDES"
 echo RSYNC=$RSYNC
 MYFQDN=$(getent hosts $MYIP | awk '{print $2}')
+[ -z "$MYFQDN" ] && MYFQDN=$1
 echo "MYIP=$MYIP ($MYFQDN)"
 echo MYNAME=$MYNAME
 echo FSLIST="$FSLIST"

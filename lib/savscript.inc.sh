@@ -259,7 +259,7 @@ if [ \$(mount -t zfs | wc -l) -gt 0 ]; then
 fi
 if [ \"\$(uname -s)\" = \"Linux\" ] && [ -e \"/etc/pve/local\" ]; then
   echo PVECLUSTER=\\\"\$(pvecm status|grep ^Name: | awk '{print \$NF}')\\\"
-  echo PVESTORAGES=\\\"\$(pvesm status | awk '{if(\$3==\"active\"){print \$1}}' | while read s; do pvesh get /storage/\$s --noborder --noheader | awk 'BEGIN{want=0;zpool=\"\";dpath=\"\"}/^content.*images/{want=1;}/^pool/{zpool=\$2;}/^shared.*1$/{want=0;}/^(path|mountpoint)/{dpath=\$2; want=1;}END{if(want==1){printf(\"'\$s':%s %s\\\n\",dpath,zpool)}}'; done)\\\";
+  echo PVESTORAGES=\\\"\$(pvesm status --content images | awk '{if(\$3==\"active\"){print \$1}}' | while read s; do pvesh get /storage/\$s --noborder --noheader | awk 'BEGIN{want=0;zpool=\"\";dpath=\"\"}/^pool/{zpool=\$2;}/^shared.*1$/{want=0;}/^(path|mountpoint)/{dpath=\$2; want=1;}END{if(want==1){printf(\"'\$s':%s %s\\\n\",dpath,zpool)}}'; done)\\\";
   if [ -x /usr/sbin/pct ]; then
     echo PVELXCS=\\\"\$(pct list | grep ' running *[^$]' | awk '{if(\$2==\"running\"){print \$1}}')\\\";
   fi

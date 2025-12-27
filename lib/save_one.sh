@@ -82,8 +82,8 @@ if init_srv $DEST; then
     fi
 
     # PROXMOX part
-    if [ "$SAV_PROXMOX" = "YES" ] && [ -n "$PVECLUSTER" ]; then
-        PVEZFSDEST="${SAVZFSBASE}/$PVECLUSTER"
+    if [ "$SAV_PROXMOX" = "YES" ] && [ -n "${PVECLUSTER:-PROXMOX-$NAME}" ]; then
+        PVEZFSDEST="${SAVZFSBASE}/${PVECLUSTER:-PROXMOX-$NAME}"
         PVEDESTDIR="$(zfs list -Homountpoint $PVEZFSDEST 2>/dev/null || ( zfs create $PVEZFSDEST && zfs list -Homountpoint $PVEZFSDEST ) )"
         for lxc in $(echo "$PVELXCS"); do
             syslogue "debug" "($NAME) get PVE LXC $lxc"
@@ -182,7 +182,7 @@ if init_srv $DEST; then
 #            else
 #               echo "$dir EXCLU"
             fi
-        if [ $myret -ne 0 ]; then
+            if [ $myret -ne 0 ]; then
               allret=$(( $allret + $myret ))
             fi
         done
