@@ -51,6 +51,8 @@ if init_srv $DEST; then
 
     myret=0
 
+    [ -d "$ZDESTDIR" ] || FIRST_SYNC=YES
+
     # JAILS
     if [ "$SAV_DOWN_JAILS" = "YES" ] && [ -n "$INACTIVEJAILS" ]; then
         JAILS="$JAILS $INACTIVEJAILS"
@@ -199,8 +201,10 @@ if init_srv $DEST; then
         justdoit shellex $TRACES/$NAME.corrections_montages.sh >> $TRACES/$NAME.corrections_montages.log 2>&1
         myret=$?
         myret=$(($myret + $(grep -v '^+' $TRACES/$NAME.corrections_montages.log | wc -l)))
-        [ $myret -eq 0 ] || MOUNTPROBLEM="YES"
-        warn_admin $myret "FULLZFS:correction_montages" "$TRACES/$NAME.corrections_montages.sh" "Certains points de montages dangereux ${MOUNTPROBLEM:+non }corriges ${MOUNTPROBLEM:+\!}"
+        if [ -z "$FIRST_SYNC" ]; then
+            [ $myret -eq 0 ] || MOUNTPROBLEM="YES"
+            warn_admin $myret "FULLZFS:correction_montages" "$TRACES/$NAME.corrections_montages.sh" "Certains points de montages dangereux ${MOUNTPROBLEM:+non }corriges ${MOUNTPROBLEM:+\!}"
+        fi
     fi
     # remontage dans l'ordre si / a un mountpoint 'legacy' (monte par fstab) ou canmount=noauto (nouvelle methode)
     if [ -n "$ZFSSLASH" ] && [ -z "$MOUNTPROBLEM" ]; then
